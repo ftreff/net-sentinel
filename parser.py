@@ -42,10 +42,38 @@ def reverse_dns(ip):
 
 def guess_service(port):
     common = {
-        22: "SSH", 80: "HTTP", 443: "HTTPS", 53: "DNS", 25: "SMTP",
-        110: "POP3", 143: "IMAP", 3306: "MySQL", 6379: "Redis", 8080: "HTTP-alt"
+        # 🔐 Security & Remote Access
+        22: "SSH", 23: "Telnet", 3389: "RDP", 5900: "VNC",
+        500: "IPsec VPN", 1194: "OpenVPN", 1701: "L2TP", 1723: "PPTP", 4500: "IPsec NAT-T",
+
+        # 📧 Email Services
+        25: "SMTP", 465: "SMTP SSL", 587: "SMTP Submission",
+        110: "POP3", 995: "POP3 SSL", 143: "IMAP", 993: "IMAP SSL",
+
+        # 📞 VoIP & Messaging
+        5060: "SIP", 5061: "SIP TLS", 3478: "STUN", 5349: "TURN", 5222: "XMPP", 5223: "XMPP SSL",
+
+        # 🎮 Gaming & P2P
+        6881: "BitTorrent", 6882: "BitTorrent", 51413: "Transmission",
+        27015: "Steam", 3074: "Xbox Live", 3478: "PSN/STUN", 3480: "PSN",
+
+        # 📺 Streaming & Media
+        1935: "RTMP Streaming", 554: "RTSP", 8000: "Icecast/Streaming", 8080: "HTTP-alt", 8443: "HTTPS-alt",
+
+        # 🧮 Crypto Mining (Monero/XMR)
+        3333: "XMR Mining", 5555: "XMR Mining", 7777: "XMR Mining",
+        9999: "XMR Mining", 14444: "XMR Mining", 16666: "XMR Mining",
+
+        # 🖧 File Sharing & Infra
+        20: "FTP-Data", 21: "FTP", 445: "SMB/Samba",
+        137: "NetBIOS Name", 138: "NetBIOS Datagram", 139: "NetBIOS Session",
+        2049: "NFS", 873: "rsync", 161: "SNMP", 162: "SNMP Trap",
+
+        # 🌐 Web & Databases
+        53: "DNS", 80: "HTTP", 443: "HTTPS", 3306: "MySQL", 6379: "Redis"
     }
-    return common.get(port, None)
+
+    return common.get(port, f"Unknown (port {port})")
 
 def geoip_lookup(ip):
     try:
