@@ -21,6 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const traceToggle = document.getElementById("toggleTrace");
     const heatToggle = document.getElementById("toggleHeat");
     const dotsToggle = document.getElementById("toggleDots");
+    const dropToggle = document.getElementById("toggleDrop");
+    const acceptToggle = document.getElementById("toggleAccept");
 
     let traceLines = [];
     let heatPoints = [];
@@ -32,11 +34,17 @@ document.addEventListener("DOMContentLoaded", () => {
         data.forEach(entry => {
           const lat = entry.latitude;
           const lon = entry.longitude;
+          const verdict = entry.verdict;
+
+          const showDrop = verdict === "DROP" && dropToggle.checked;
+          const showAccept = verdict === "ACCEPT" && acceptToggle.checked;
+
+          if (!showDrop && !showAccept) return;
 
           if (dotsToggle.checked) {
             const marker = L.circleMarker([lat, lon], {
               radius: 4,
-              color: "#00ffcc",
+              color: verdict === "DROP" ? "#ff4444" : "#44ff44",
               fillOpacity: 0.7
             }).addTo(map);
             dotMarkers.push(marker);
@@ -44,7 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (traceToggle.checked && entry.trace_path) {
             const hops = entry.trace_path.split(",").map(h => h.trim()).filter(h => h);
-            const latlngs = hops.map(ip => [lat, lon]); // placeholder — could be enriched later
+            const latlngs = hops.map(ip => [lat, lon]); // placeholder
             const polyline = L.polyline(latlngs, { color: "#ff6600", weight: 1 }).addTo(map);
             traceLines.push(polyline);
           }
@@ -55,7 +63,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         // Optional: add heatmap layer if needed
-        // Requires leaflet-heat plugin
       });
 
     // 🏆 Rankings
@@ -81,7 +88,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const tr = document.createElement("tr");
           [
             "ip", "reverse_dns", "direction", "port", "service",
-            "timestamp", "city", "state", "country", "country_code"
+            "timestamp", "city", "state", "country", "country_code", "verdict"
           ].forEach(key => {
             const td = document.createElement("td");
             td.textContent = row[key] || "";
