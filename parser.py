@@ -5,7 +5,8 @@ import socket
 import datetime
 import geoip2.database
 
-LOG_DIR = "data/logs"
+#LOG_DIR = "data/logs"
+LOG_DIR = "/var/log"
 DB_FILE = "net_sentinel.db"
 GEOIP_DB = "data/geoip/GeoLite2-City.mmdb"
 
@@ -81,8 +82,9 @@ def insert_event(event):
 
 def process_logs():
     for filename in os.listdir(LOG_DIR):
-        filepath = os.path.join(LOG_DIR, filename)
-        if not filename.endswith(".log"):
+        #filepath = os.path.join(LOG_DIR, filename)
+        #if not filename.endswith(".log"):
+        if filename != "router.log":
             continue
         with open(filepath, "r") as f:
             for line in f:
