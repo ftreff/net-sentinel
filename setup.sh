@@ -1,32 +1,31 @@
 #!/bin/bash
 
-echo "🔧 Net Sentinel 2 Setup Starting..."
+echo "🔧 Setting up Net Sentinel 2..."
 
 # Create folders
 mkdir -p data/logs
 mkdir -p data/geoip
-mkdir -p static
+
+# Create or reset database
+if [ ! -f net_sentinel.db ]; then
+  echo "🗃️ Creating database..."
+  sqlite3 net_sentinel.db < schema.sql
+else
+  echo "🗃️ Database already exists. Skipping creation."
+fi
 
 # Install Python dependencies
 echo "📦 Installing Python packages..."
-#pip install --upgrade pip
-#pip install flask requests geoip2 dnspython
 sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython -y
 
-# Download GeoLite2-City.mmdb from GitHub mirror
-echo "🌍 Downloading GeoLite2-City.mmdb from GitHub..."
-wget -q --show-progress https://github.com/P3TERX/GeoLite.mmdb/releases/latest/download/GeoLite2-City.mmdb -O data/geoip/GeoLite2-City.mmdb
-
-# Create SQLite database
-echo "🗃️ Creating SQLite database..."
-DB_FILE="net_sentinel.db"
-SCHEMA_FILE="schema.sql"
-
-if [ -f "$SCHEMA_FILE" ]; then
-    sqlite3 "$DB_FILE" < "$SCHEMA_FILE"
-    echo "✅ Database created: $DB_FILE"
+# Download GeoLite2 if missing
+GEOIP_DB="data/geoip/GeoLite2-City.mmdb"
+if [ ! -f "$GEOIP_DB" ]; then
+  echo "🌍 Downloading GeoLite2-City.mmdb..."
+  echo "⚠️ You must have a MaxMind license key to download this file."
+  echo "Visit https://dev.maxmind.com/geoip/geolite2-free-geolocation-data?lang=en to get access."
 else
-    echo "⚠️ schema.sql not found. Please add it before running setup."
+  echo "🌍 GeoIP database already exists."
 fi
 
-echo "✅ Setup complete. You’re ready to parse logs and launch the dashboard."
+echo "✅ Setup complete."
