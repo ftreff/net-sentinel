@@ -70,7 +70,7 @@ def enrich_ip(ip, port, direction):
         "direction": direction,
         "port": port,
         "service": guess_service(port),
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "city": info.get("city"),
         "state": info.get("state"),
         "country": info.get("country"),
