@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS ip_events (
     country_code TEXT,
     latitude REAL,
     longitude REAL,
-    trace_path TEXT  -- optional: comma-separated hops or JSON array
+    trace_path TEXT,  -- optional: comma-separated hops or JSON array
+    verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT'))  -- new: packet status
 );
 
 -- Optional index for faster country-based queries
