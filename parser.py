@@ -82,10 +82,9 @@ def insert_event(event):
 
 def process_logs():
     for filename in os.listdir(LOG_DIR):
-        #filepath = os.path.join(LOG_DIR, filename)
-        #if not filename.endswith(".log"):
         if filename != "router.log":
             continue
+        filepath = os.path.join(LOG_DIR, filename)
         with open(filepath, "r") as f:
             for line in f:
                 parsed = parse_log_line(line)
