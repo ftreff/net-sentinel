@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Net Sentinel 2 — Map Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>🌐 Net Sentinel 2</h1>
+    <div class="toggles">
+      <label><input type="checkbox" id="toggleDots" checked /> Locations</label>
+      <label><input type="checkbox" id="toggleHeat" /> Heatmap</label>
+      <label><input type="checkbox" id="toggleTrace" /> Trace Lines</label>
+      <label><input type="checkbox" id="toggleDark" /> Dark Mode</label>
+    </div>
+  </header>
+
+  <main>
+    <div id="map"></div>
+    <aside id="rankings">
+      <h2>🌍 Country Rankings</h2>
+      <ul id="rankingList"></ul>
+    </aside>
+  </main>
+</body>
+</html>
