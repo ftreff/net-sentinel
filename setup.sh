@@ -9,8 +9,9 @@ mkdir -p static
 
 # Install Python dependencies
 echo "📦 Installing Python packages..."
-pip install --upgrade pip
-pip install flask requests geoip2 dnspython
+#pip install --upgrade pip
+#pip install flask requests geoip2 dnspython
+sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython
 
 # Download GeoLite2-City.mmdb from GitHub mirror
 echo "🌍 Downloading GeoLite2-City.mmdb from GitHub..."
