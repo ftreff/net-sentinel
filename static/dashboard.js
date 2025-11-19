@@ -5,10 +5,10 @@ let currentVerdict = "ALL";
 let currentService = "ALL";
 let showTraces = true;
 let darkMode = true;
+let currentTileLayer;
 
 function initMap() {
   map = L.map("map").setView([20, 0], 2);
-
   setTileLayer();
 
   fetch("/api/events")
@@ -61,16 +61,18 @@ function setTileLayer() {
     ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
     : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-  if (map._tileLayer) map.removeLayer(map._tileLayer);
-
   const tileLayer = L.tileLayer(url, {
     attribution: '&copy; OpenStreetMap & CartoDB',
     subdomains: "abcd",
     maxZoom: 19,
   });
 
+  if (currentTileLayer && map.hasLayer(currentTileLayer)) {
+    map.removeLayer(currentTileLayer);
+  }
+
   tileLayer.addTo(map);
-  map._tileLayer = tileLayer;
+  currentTileLayer = tileLayer;
 }
 
 function filterMarkers(verdict) {
