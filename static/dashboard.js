@@ -12,8 +12,8 @@ function initMap() {
   setTileLayer();
   loadEvents();
 
-  // Start polling every 10 seconds
-  setInterval(refreshMap, 10000);
+  // Poll every 60 seconds
+  setInterval(refreshMap, 60000);
 }
 
 function setTileLayer() {
@@ -61,6 +61,7 @@ function loadEvents() {
         const popup = `
           <div class="info-window">
             <strong>IP:</strong> ${event.ip}<br>
+            <strong>Reverse DNS:</strong> ${event.reverse_dns || "N/A"}<br>
             <strong>Verdict:</strong> ${event.verdict}<br>
             <strong>Service:</strong> ${event.service}<br>
             <strong>Location:</strong> ${event.city}, ${event.country}<br>
@@ -124,7 +125,7 @@ function drawTracesToAlbany() {
     if (verdictMatch && serviceMatch) {
       const line = L.polyline([marker.getLatLng(), albanyLatLng], {
         color: "#00ffcc",
-        weight: 2,
+        weight: 1,
         opacity: 0.6,
       });
       line.addTo(map);
