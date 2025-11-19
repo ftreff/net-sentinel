@@ -9,17 +9,13 @@ Net Sentinel 2 is a real-time network intelligence dashboard that parses router 
   - Reverse DNS lookup
   - GeoIP location (city, state, country, lat/lon)
   - Port-based service guessing (e.g. SSH, HTTP, BitTorrent)
-  - Traceroute path to source IPs
 - 🗃️ **Database Logging**: Stores enriched events in SQLite for querying and visualization
 - 🗺️ **Interactive Dashboard**:
   - World map with toggleable overlays:
     - Trace lines
-    - Heat maps
     - Location dots
-  - Country rankings by intrusion volume
   - Light/dark mode toggle
-  - Built-in traceroute tool
-  - Table view of IPs by country with full metadata
+
 
 ## ⚙️ Setup
 
@@ -36,12 +32,9 @@ net-sentinel-2/
 ├── schema.sql            # SQLite schema
 ├── parser.py             # Log parser and enrichment engine
 ├── dashboard.py          # Backend API
-├── trace.py              # Traceroute module
 ├── static/               # Frontend files
 │   ├── map.html          # Map UI (loads dashboard.js and style.css)
-│   ├── table.html        # Table UI
 │   ├── style.css         # Neon hacker theme
-│   ├── script.js         # Legacy logic (can be deprecated or merged)
 │   └── dashboard.js      # New modular map logic (toggles, filters, trace lines)
 ├── data/
 │   ├── logs/             # Raw router logs
