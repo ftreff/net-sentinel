@@ -5,7 +5,7 @@ let currentVerdict = "ALL";
 let currentService = "ALL";
 let showTraces = true;
 let darkMode = true;
-let currentTileLayer;
+let currentTileLayer = null;
 
 function initMap() {
   map = L.map("map").setView([20, 0], 2);
@@ -67,7 +67,7 @@ function setTileLayer() {
     maxZoom: 19,
   });
 
-  if (currentTileLayer && map.hasLayer(currentTileLayer)) {
+  if (currentTileLayer && map && map.hasLayer(currentTileLayer)) {
     map.removeLayer(currentTileLayer);
   }
 
