@@ -10,10 +10,36 @@ let currentTileLayer = null;
 function initMap() {
   map = L.map("map").setView([20, 0], 2);
   setTileLayer();
+  loadEvents();
 
+  // Start polling every 10 seconds
+  setInterval(refreshMap, 10000);
+}
+
+function setTileLayer() {
+  const url = darkMode
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+
+  const tileLayer = L.tileLayer(url, {
+    attribution: '&copy; OpenStreetMap & CartoDB',
+    subdomains: "abcd",
+    maxZoom: 19,
+  });
+
+  if (currentTileLayer && map.hasLayer(currentTileLayer)) {
+    map.removeLayer(currentTileLayer);
+  }
+
+  tileLayer.addTo(map);
+  currentTileLayer = tileLayer;
+}
+
+function loadEvents() {
   fetch("/api/events")
     .then((res) => res.json())
     .then((data) => {
+      clearMap();
       data.forEach((event) => {
         const latlng = [event.latitude, event.longitude];
 
@@ -53,26 +79,20 @@ function initMap() {
           polylines.push(polyline);
         }
       });
+
+      updateVisibility();
     });
 }
 
-function setTileLayer() {
-  const url = darkMode
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+function clearMap() {
+  markers.forEach((m) => map.removeLayer(m));
+  polylines.forEach((p) => map.removeLayer(p));
+  markers = [];
+  polylines = [];
+}
 
-  const tileLayer = L.tileLayer(url, {
-    attribution: '&copy; OpenStreetMap & CartoDB',
-    subdomains: "abcd",
-    maxZoom: 19,
-  });
-
-  if (currentTileLayer && map && map.hasLayer(currentTileLayer)) {
-    map.removeLayer(currentTileLayer);
-  }
-
-  tileLayer.addTo(map);
-  currentTileLayer = tileLayer;
+function refreshMap() {
+  loadEvents(); // fetch + redraw
 }
 
 function filterMarkers(verdict) {
@@ -95,10 +115,7 @@ function updateVisibility() {
       map.removeLayer(marker);
     }
   });
-}
 
-function toggleTraces() {
-  showTraces = !showTraces;
   polylines.forEach((line) => {
     if (showTraces) {
       line.addTo(map);
@@ -106,6 +123,11 @@ function toggleTraces() {
       map.removeLayer(line);
     }
   });
+}
+
+function toggleTraces() {
+  showTraces = !showTraces;
+  updateVisibility();
 }
 
 function toggleDarkMode() {
