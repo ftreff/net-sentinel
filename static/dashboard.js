@@ -4,33 +4,32 @@ let polylines = [];
 let currentVerdict = "ALL";
 let currentService = "ALL";
 let showTraces = true;
+let darkMode = true;
 
 function initMap() {
-  map = new google.maps.Map(document.getElementById("map"), {
-    center: { lat: 20, lng: 0 },
-    zoom: 2,
-    styles: darkMapStyle,
-    mapTypeControl: false,
-    streetViewControl: false,
-    fullscreenControl: false,
-  });
+  map = L.map("map").setView([20, 0], 2);
+
+  setTileLayer();
 
   fetch("/api/events")
-    .then((response) => response.json())
+    .then((res) => res.json())
     .then((data) => {
       data.forEach((event) => {
-        const position = { lat: event.latitude, lng: event.longitude };
+        const latlng = [event.latitude, event.longitude];
 
-        const marker = new google.maps.Marker({
-          position,
-          map,
-          icon: getMarkerIcon(event.verdict),
+        const marker = L.circleMarker(latlng, {
+          radius: 6,
+          fillColor: event.verdict === "DROP" ? "#ff3366" : "#00ffcc",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.9,
         });
 
         marker.verdict = event.verdict;
         marker.service = event.service;
 
-        const content = `
+        const popup = `
           <div class="info-window">
             <strong>IP:</strong> ${event.ip}<br>
             <strong>Verdict:</strong> ${event.verdict}<br>
@@ -39,38 +38,39 @@ function initMap() {
             <strong>Time:</strong> ${event.timestamp}
           </div>
         `;
-        const infowindow = new google.maps.InfoWindow({ content });
-        marker.addListener("click", () => infowindow.open(map, marker));
-
+        marker.bindPopup(popup);
+        marker.addTo(map);
         markers.push(marker);
 
         if (event.trace_path && event.trace_path.length > 1) {
-          const path = event.trace_path.map((hop) => ({
-            lat: hop.latitude,
-            lng: hop.longitude,
-          }));
-          const line = new google.maps.Polyline({
-            path,
-            geodesic: true,
-            strokeColor: "#00ffcc",
-            strokeOpacity: 0.6,
-            strokeWeight: 2,
+          const path = event.trace_path.map((hop) => [hop.latitude, hop.longitude]);
+          const polyline = L.polyline(path, {
+            color: "#00ffcc",
+            weight: 2,
+            opacity: 0.6,
           });
-          line.setMap(showTraces ? map : null);
-          polylines.push(line);
+          if (showTraces) polyline.addTo(map);
+          polylines.push(polyline);
         }
       });
     });
 }
 
-function getMarkerIcon(verdict) {
-  return {
-    path: google.maps.SymbolPath.CIRCLE,
-    scale: 5,
-    fillColor: verdict === "DROP" ? "#ff3366" : "#00ffcc",
-    fillOpacity: 1,
-    strokeWeight: 0,
-  };
+function setTileLayer() {
+  const url = darkMode
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+  if (map._tileLayer) map.removeLayer(map._tileLayer);
+
+  const tileLayer = L.tileLayer(url, {
+    attribution: '&copy; OpenStreetMap & CartoDB',
+    subdomains: "abcd",
+    maxZoom: 19,
+  });
+
+  tileLayer.addTo(map);
+  map._tileLayer = tileLayer;
 }
 
 function filterMarkers(verdict) {
@@ -87,28 +87,27 @@ function updateVisibility() {
   markers.forEach((marker) => {
     const verdictMatch = currentVerdict === "ALL" || marker.verdict === currentVerdict;
     const serviceMatch = currentService === "ALL" || marker.service === currentService;
-    marker.setMap(verdictMatch && serviceMatch ? map : null);
+    if (verdictMatch && serviceMatch) {
+      marker.addTo(map);
+    } else {
+      map.removeLayer(marker);
+    }
   });
 }
 
 function toggleTraces() {
   showTraces = !showTraces;
-  polylines.forEach((line) => line.setMap(showTraces ? map : null));
+  polylines.forEach((line) => {
+    if (showTraces) {
+      line.addTo(map);
+    } else {
+      map.removeLayer(line);
+    }
+  });
 }
 
 function toggleDarkMode() {
-  const isDark = document.body.classList.toggle("dark");
-  map.setOptions({ styles: isDark ? darkMapStyle : null });
+  darkMode = !darkMode;
+  document.body.classList.toggle("dark");
+  setTileLayer();
 }
-
-const darkMapStyle = [
-  { elementType: "geometry", stylers: [{ color: "#0d0d0d" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#00ffcc" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#000000" }] },
-  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#333" }] },
-  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#00ffcc" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#222" }] },
-  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#00ffcc" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#444" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#001f1f" }] },
-];
