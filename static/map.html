@@ -4,10 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Net Sentinel 2 – Threat Map</title>
+
+  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Custom Styles -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
   <style>
-    #map { height: 100vh; width: 100%; }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
   </style>
 </head>
 <body class="dark">
@@ -18,8 +26,53 @@
     <select id="serviceFilter" onchange="filterByService(this.value)">
       <option value="ALL">All Services</option>
       <option value="SSH">SSH</option>
-      <option value="XMR Mining">XMR Mining</option>
+      <option value="Telnet">Telnet</option>
+      <option value="RDP">RDP</option>
+      <option value="VNC">VNC</option>
+      <option value="IPsec VPN">IPsec VPN</option>
+      <option value="OpenVPN">OpenVPN</option>
+      <option value="L2TP">L2TP</option>
+      <option value="PPTP">PPTP</option>
+      <option value="IPsec NAT-T">IPsec NAT-T</option>
+      <option value="SMTP">SMTP</option>
+      <option value="SMTP SSL">SMTP SSL</option>
+      <option value="SMTP Submission">SMTP Submission</option>
+      <option value="POP3">POP3</option>
+      <option value="POP3 SSL">POP3 SSL</option>
+      <option value="IMAP">IMAP</option>
+      <option value="IMAP SSL">IMAP SSL</option>
+      <option value="SIP">SIP</option>
+      <option value="SIP TLS">SIP TLS</option>
+      <option value="STUN">STUN</option>
+      <option value="TURN">TURN</option>
+      <option value="XMPP">XMPP</option>
+      <option value="XMPP SSL">XMPP SSL</option>
       <option value="BitTorrent">BitTorrent</option>
+      <option value="Transmission">Transmission</option>
+      <option value="Steam">Steam</option>
+      <option value="Xbox Live">Xbox Live</option>
+      <option value="PSN">PSN</option>
+      <option value="RTMP Streaming">RTMP Streaming</option>
+      <option value="RTSP">RTSP</option>
+      <option value="Icecast/Streaming">Icecast/Streaming</option>
+      <option value="HTTP-alt">HTTP-alt</option>
+      <option value="HTTPS-alt">HTTPS-alt</option>
+      <option value="XMR Mining">XMR Mining</option>
+      <option value="FTP-Data">FTP-Data</option>
+      <option value="FTP">FTP</option>
+      <option value="SMB/Samba">SMB/Samba</option>
+      <option value="NetBIOS Name">NetBIOS Name</option>
+      <option value="NetBIOS Datagram">NetBIOS Datagram</option>
+      <option value="NetBIOS Session">NetBIOS Session</option>
+      <option value="NFS">NFS</option>
+      <option value="rsync">rsync</option>
+      <option value="SNMP">SNMP</option>
+      <option value="SNMP Trap">SNMP Trap</option>
+      <option value="DNS">DNS</option>
+      <option value="HTTP">HTTP</option>
+      <option value="HTTPS">HTTPS</option>
+      <option value="MySQL">MySQL</option>
+      <option value="Redis">Redis</option>
     </select>
     <button onclick="toggleTraces()">Toggle Traces</button>
     <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
@@ -30,7 +83,12 @@
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Dashboard logic -->
+  <!-- Dashboard Logic -->
   <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+
+  <!-- Ensure map initializes -->
+  <script>
+    window.onload = initMap;
+  </script>
 </body>
 </html>
