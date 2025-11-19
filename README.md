@@ -38,10 +38,11 @@ net-sentinel-2/
 ├── dashboard.py          # Backend API
 ├── trace.py              # Traceroute module
 ├── static/               # Frontend files
-│   ├── map.html          # Map UI
+│   ├── map.html          # Map UI (loads dashboard.js and style.css)
 │   ├── table.html        # Table UI
-│   ├── style.css         # Styles
-│   └── script.js         # Frontend logic
+│   ├── style.css         # Neon hacker theme
+│   ├── script.js         # Legacy logic (can be deprecated or merged)
+│   └── dashboard.js      # New modular map logic (toggles, filters, trace lines)
 ├── data/
 │   ├── logs/             # Raw router logs
 │   └── geoip/            # GeoIP database
