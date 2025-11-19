@@ -4,6 +4,7 @@ import sqlite3
 import socket
 import datetime
 import geoip2.database
+from tqdm import tqdm
 
 LOG_DIR = "/var/log"
 DB_PATH = "net_sentinel.db"
@@ -49,37 +50,21 @@ def reverse_dns(ip):
 
 def guess_service(port):
     common = {
-        # 🔐 Security & Remote Access
         22: "SSH", 23: "Telnet", 3389: "RDP", 5900: "VNC",
         500: "IPsec VPN", 1194: "OpenVPN", 1701: "L2TP", 1723: "PPTP", 4500: "IPsec NAT-T",
-
-        # 📧 Email Services
         25: "SMTP", 465: "SMTP SSL", 587: "SMTP Submission",
         110: "POP3", 995: "POP3 SSL", 143: "IMAP", 993: "IMAP SSL",
-
-        # 📞 VoIP & Messaging
         5060: "SIP", 5061: "SIP TLS", 3478: "STUN", 5349: "TURN", 5222: "XMPP", 5223: "XMPP SSL",
-
-        # 🎮 Gaming & P2P
         6881: "BitTorrent", 6882: "BitTorrent", 51413: "Transmission",
-        27015: "Steam", 3074: "Xbox Live", 3478: "PSN/STUN", 3480: "PSN",
-
-        # 📺 Streaming & Media
+        27015: "Steam", 3074: "Xbox Live", 3480: "PSN",
         1935: "RTMP Streaming", 554: "RTSP", 8000: "Icecast/Streaming", 8080: "HTTP-alt", 8443: "HTTPS-alt",
-
-        # 🧮 Crypto Mining (Monero/XMR)
         3333: "XMR Mining", 5555: "XMR Mining", 7777: "XMR Mining",
         9999: "XMR Mining", 14444: "XMR Mining", 16666: "XMR Mining",
-
-        # 🖧 File Sharing & Infra
         20: "FTP-Data", 21: "FTP", 445: "SMB/Samba",
         137: "NetBIOS Name", 138: "NetBIOS Datagram", 139: "NetBIOS Session",
         2049: "NFS", 873: "rsync", 161: "SNMP", 162: "SNMP Trap",
-
-        # 🌐 Web & Databases
         53: "DNS", 80: "HTTP", 443: "HTTPS", 3306: "MySQL", 6379: "Redis"
     }
-
     return common.get(port, f"Unknown (port {port})")
 
 def geoip_lookup(ip):
@@ -143,21 +128,29 @@ def process_logs():
         if filename != "router.log":
             continue
         filepath = os.path.join(LOG_DIR, filename)
-        batch = []
         with open(filepath, "r") as f:
-            for line in f:
-                parsed = parse_log_line(line)
-                if parsed:
-                    direction, ip, port, verdict = parsed
-                    event = enrich_ip(ip, port, direction)
-                    event["verdict"] = verdict
-                    batch.append(event)
-                    if len(batch) >= 100:
-                        insert_events(batch)
-                        batch = []
+            lines = f.readlines()
+
+        batch = []
+        inserted = 0
+
+        for line in tqdm(lines, desc=f"Processing {filename}", unit="line"):
+            parsed = parse_log_line(line)
+            if parsed:
+                direction, ip, port, verdict = parsed
+                event = enrich_ip(ip, port, direction)
+                event["verdict"] = verdict
+                batch.append(event)
+                if len(batch) >= 100:
+                    insert_events(batch)
+                    inserted += len(batch)
+                    batch = []
+
         if batch:
             insert_events(batch)
-        print(f"✅ Optimized parser processed {filename}")
+            inserted += len(batch)
+
+        print(f"\n✅ Finished {filename} — {inserted} new events added")
 
 if __name__ == "__main__":
     process_logs()
