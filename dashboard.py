@@ -1,59 +1,44 @@
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, render_template, jsonify
 import sqlite3
+import json
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", template_folder="static")
 
-DB_PATH = "net_sentinel.db"
+@app.route("/")
+def index():
+    return render_template("map.html")
 
-@app.route("/api/map")
-def map_data():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        SELECT ip, latitude, longitude, country_code, trace_path, verdict
-        FROM ip_events
-        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-    """)
-    rows = c.fetchall()
+@app.route("/api/events")
+def get_events():
+    conn = sqlite3.connect("net_sentinel.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT * FROM ip_events")
+    rows = cursor.fetchall()
     conn.close()
-    keys = ["ip", "latitude", "longitude", "country_code", "trace_path", "verdict"]
-    return jsonify([dict(zip(keys, row)) for row in rows])
 
-@app.route("/api/rankings")
-def rankings():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        SELECT country_code, COUNT(*) as count
-        FROM ip_events
-        GROUP BY country_code
-        ORDER BY count DESC
-        LIMIT 10
-    """)
-    rows = c.fetchall()
-    conn.close()
-    return jsonify([{"country_code": row[0], "count": row[1]} for row in rows])
+    events = []
+    for row in rows:
+        trace = []
+        try:
+            trace = json.loads(row["trace_path"]) if row["trace_path"] else []
+        except Exception:
+            trace = []
 
-@app.route("/api/table")
-def table_data():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        SELECT ip, reverse_dns, direction, port, service, timestamp,
-               city, state, country, country_code, verdict
-        FROM ip_events
-        ORDER BY timestamp DESC
-        LIMIT 500
-    """)
-    rows = c.fetchall()
-    conn.close()
-    keys = ["ip", "reverse_dns", "direction", "port", "service", "timestamp",
-            "city", "state", "country", "country_code", "verdict"]
-    return jsonify([dict(zip(keys, row)) for row in rows])
+        events.append({
+            "ip": row["ip"],
+            "verdict": row["verdict"],
+            "service": row["service"],
+            "city": row["city"],
+            "country": row["country"],
+            "timestamp": row["timestamp"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "trace_path": trace
+        })
 
-@app.route("/static/<path:path>")
-def static_files(path):
-    return send_from_directory("static", path)
+    return jsonify(events)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
