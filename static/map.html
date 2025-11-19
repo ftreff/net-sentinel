@@ -2,31 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Net Sentinel 2 — Map</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Net Sentinel 2 – Threat Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="script.js" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    #map { height: 100vh; width: 100%; }
+  </style>
 </head>
-<body>
-  <header>
-    <h1>🛰️ Net Sentinel 2 — Map View</h1>
-    <div class="toggles">
-      <label><input type="checkbox" id="toggleDark" /> Dark Mode</label>
-      <label><input type="checkbox" id="toggleTrace" /> Trace Lines</label>
-      <label><input type="checkbox" id="toggleHeat" /> Heatmap</label>
-      <label><input type="checkbox" id="toggleDots" checked /> Location Dots</label>
-      <label><input type="checkbox" id="toggleDrop" checked /> Dropped</label>
-      <label><input type="checkbox" id="toggleAccept" checked /> Accepted</label>
-    </div>
-  </header>
+<body class="dark">
+  <div style="padding: 10px; background-color: #000;">
+    <button onclick="filterMarkers('ALL')">All</button>
+    <button onclick="filterMarkers('DROP')">Dropped</button>
+    <button onclick="filterMarkers('ACCEPT')">Accepted</button>
+    <select id="serviceFilter" onchange="filterByService(this.value)">
+      <option value="ALL">All Services</option>
+      <option value="SSH">SSH</option>
+      <option value="XMR Mining">XMR Mining</option>
+      <option value="BitTorrent">BitTorrent</option>
+    </select>
+    <button onclick="toggleTraces()">Toggle Traces</button>
+    <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+  </div>
 
-  <main>
-    <div id="map"></div>
-    <aside id="rankings">
-      <h2>🌍 Top Countries</h2>
-      <ul id="rankingList"></ul>
-    </aside>
-  </main>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Dashboard logic -->
+  <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>
