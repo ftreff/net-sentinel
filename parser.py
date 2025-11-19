@@ -65,7 +65,8 @@ def guess_service(port):
         2049: "NFS", 873: "rsync", 161: "SNMP", 162: "SNMP Trap",
         53: "DNS", 80: "HTTP", 443: "HTTPS", 3306: "MySQL", 6379: "Redis"
     }
-    return common.get(port, f"Unknown (port {port})")
+    name = common.get(port, f"Unknown")
+    return f"{name} ({port})"
 
 def geoip_lookup(ip):
     if ip in geoip_cache:
