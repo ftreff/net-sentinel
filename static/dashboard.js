@@ -3,7 +3,7 @@ let markers = [];
 let polylines = [];
 let currentVerdict = "ALL";
 let currentService = "ALL";
-let showTraces = true;
+let showTraces = false;
 let darkMode = true;
 let currentTileLayer = null;
 
@@ -40,7 +40,10 @@ function loadEvents() {
     .then((res) => res.json())
     .then((data) => {
       clearMap();
+
       data.forEach((event) => {
+        if (event.latitude == null || event.longitude == null) return;
+
         const latlng = [event.latitude, event.longitude];
 
         const marker = L.circleMarker(latlng, {
@@ -67,20 +70,10 @@ function loadEvents() {
         marker.bindPopup(popup);
         marker.addTo(map);
         markers.push(marker);
-
-        if (event.trace_path && event.trace_path.length > 1) {
-          const path = event.trace_path.map((hop) => [hop.latitude, hop.longitude]);
-          const polyline = L.polyline(path, {
-            color: "#00ffcc",
-            weight: 2,
-            opacity: 0.6,
-          });
-          if (showTraces) polyline.addTo(map);
-          polylines.push(polyline);
-        }
       });
 
       updateVisibility();
+      if (showTraces) drawTracesToAlbany();
     });
 }
 
@@ -92,17 +85,19 @@ function clearMap() {
 }
 
 function refreshMap() {
-  loadEvents(); // fetch + redraw
+  loadEvents();
 }
 
 function filterMarkers(verdict) {
   currentVerdict = verdict;
   updateVisibility();
+  if (showTraces) drawTracesToAlbany();
 }
 
 function filterByService(service) {
   currentService = service;
   updateVisibility();
+  if (showTraces) drawTracesToAlbany();
 }
 
 function updateVisibility() {
@@ -116,11 +111,24 @@ function updateVisibility() {
     }
   });
 
-  polylines.forEach((line) => {
-    if (showTraces) {
+  polylines.forEach((line) => map.removeLayer(line));
+  polylines = [];
+}
+
+function drawTracesToAlbany() {
+  const albanyLatLng = [42.6526, -73.7562];
+
+  markers.forEach((marker) => {
+    const verdictMatch = currentVerdict === "ALL" || marker.verdict === currentVerdict;
+    const serviceMatch = currentService === "ALL" || marker.service === currentService;
+    if (verdictMatch && serviceMatch) {
+      const line = L.polyline([marker.getLatLng(), albanyLatLng], {
+        color: "#00ffcc",
+        weight: 2,
+        opacity: 0.6,
+      });
       line.addTo(map);
-    } else {
-      map.removeLayer(line);
+      polylines.push(line);
     }
   });
 }
@@ -128,6 +136,7 @@ function updateVisibility() {
 function toggleTraces() {
   showTraces = !showTraces;
   updateVisibility();
+  if (showTraces) drawTracesToAlbany();
 }
 
 function toggleDarkMode() {
