@@ -50,9 +50,9 @@ Then open http://localhost:5000 in your browser.
 ```
 net-sentinel-2/
 ├── setup.sh              # One-time setup script
-├── schema.sql            # SQLite schema
-├── parser.py             # Log parser and enrichment engine
 ├── ingest.sh             # Runs parser.py with priority
+├── setup-log-server.sh   # Script configures rsyslog to receive logs from a router
+├── parser.py             # Log parser and enrichment engine
 ├── dashboard.py          # Backend API
 ├── static/               # Frontend files
 │   ├── map.html          # Map UI (loads dashboard.js and style.css)
@@ -61,6 +61,7 @@ net-sentinel-2/
 ├── data/
 │   ├── logs/             # Raw router logs
 │   └── geoip/            # GeoIP database
+├── schema.sql            # SQLite schema
 ├── net_sentinel.db       # SQLite database
 └── README.md             # Project overview
 ```
