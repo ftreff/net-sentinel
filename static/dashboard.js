@@ -21,7 +21,9 @@ function initMap() {
   L.control.layers(baseMaps).addTo(map);
 
   addTimeFilterControl();
+  addStatsBar();
   loadEvents(); // default: all time
+  loadStats();  // initial stats
 }
 
 function addTimeFilterControl() {
@@ -44,6 +46,22 @@ function addTimeFilterControl() {
   control.addTo(map);
 }
 
+function addStatsBar() {
+  const stats = L.control({ position: "bottomleft" });
+  stats.onAdd = function () {
+    const div = L.DomUtil.create("div", "stats-bar");
+    div.id = "statsBar";
+    div.style.background = "rgba(0,0,0,0.7)";
+    div.style.color = "#fff";
+    div.style.padding = "8px";
+    div.style.fontSize = "12px";
+    div.style.maxWidth = "300px";
+    div.innerHTML = "Loading stats...";
+    return div;
+  };
+  stats.addTo(map);
+}
+
 function onTimeRangeChange() {
   const val = document.getElementById("timeRange").value;
   let since = null;
@@ -60,6 +78,7 @@ function onTimeRangeChange() {
   }
 
   loadEvents(since);
+  loadStats(); // refresh stats too
 }
 
 function loadEvents(since = null) {
@@ -113,6 +132,24 @@ function refreshReverseDNS(ip) {
     .catch((err) => {
       console.error("Reverse DNS update failed:", err);
       alert("Failed to update reverse DNS.");
+    });
+}
+
+function loadStats() {
+  fetch("/api/stats")
+    .then((res) => res.json())
+    .then((stats) => {
+      const div = document.getElementById("statsBar");
+      div.innerHTML = `
+        <b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}<br>
+        <b>Top Countries:</b><br>
+        ${stats.top_countries.map(c => `&nbsp;&nbsp;${c.country || "N/A"} (${c.count})`).join("<br>")}<br>
+        <b>Top Ports:</b><br>
+        ${stats.top_ports.map(p => `&nbsp;&nbsp;${p.port} (${p.count})`).join("<br>")}
+      `;
+    })
+    .catch((err) => {
+      console.error("Failed to load stats:", err);
     });
 }
 
