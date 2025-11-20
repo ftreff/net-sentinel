@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Net Sentinel 2 - Router Log Server Setup
+# Net Sentinel - Router Log Server Setup
 # This script configures rsyslog to receive logs from a router and save them to /var/log/router.log
 
 set -e
