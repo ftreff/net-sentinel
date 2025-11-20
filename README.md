@@ -1,6 +1,6 @@
-# Net Sentinel 2
+# Net Sentinel
 
-Net Sentinel 2 is a real-time network intelligence dashboard that parses router logs, enriches IP data, and visualizes global intrusion attempts. It combines log analysis, GeoIP mapping, service detection, and traceroute diagnostics into a single interactive interface.
+Net Sentinel is a real-time network intelligence dashboard that parses router logs, enriches IP data, and visualizes global intrusion attempts. It combines log analysis, GeoIP mapping, service detection, and traceroute diagnostics into a single interactive interface.
 
 ## 🌐 Features
 
