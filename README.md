@@ -49,17 +49,16 @@ Then open http://localhost:5000 in your browser.
 ## 📁 Project Structure
 ```
 net-sentinel-2/
-├── setup.sh              # One-time setup script
-├── ingest.sh             # Runs parser.py with priority
 ├── setup-log-server.sh   # Script configures rsyslog to receive logs from a router
+├── setup.sh              # One-time setup script
+├── ingest.sh             # Runs parser with priority
 ├── parser.py             # Log parser and enrichment engine
 ├── dashboard.py          # Backend API
 ├── static/               # Frontend files
 │   ├── map.html          # Map UI (loads dashboard.js and style.css)
-│   ├── style.css         # Neon hacker theme
-│   └── dashboard.js      # New modular map logic (toggles, filters, trace lines)
+│   ├── style.css         # Hacker theme
+│   └── dashboard.js      # Map logic
 ├── data/
-│   ├── logs/             # Raw router logs
 │   └── geoip/            # GeoIP database
 ├── schema.sql            # SQLite schema
 ├── net_sentinel.db       # SQLite database
@@ -69,6 +68,8 @@ net-sentinel-2/
 ---
 
 ## 🧪 Requirements
+
+A router that can send syslog to your server’s IP on UDP port 514.
 
 Python 3.8+
 
