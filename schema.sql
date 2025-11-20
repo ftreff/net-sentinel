@@ -1,4 +1,4 @@
--- Net Sentinel 2: SQLite schema for enriched IP events
+-- Net Sentinel: SQLite schema for enriched IP events
 
 CREATE TABLE IF NOT EXISTS ip_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
