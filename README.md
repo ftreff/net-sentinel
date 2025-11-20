@@ -1,6 +1,6 @@
-# Net Sentinel 2
+# Net Sentinel
 
-**Net Sentinel 2** is a real-time network event visualization and analysis tool. It ingests firewall logs, parses and enriches them with geolocation and reverse DNS data, and displays the results on an interactive map with filtering and statistics.
+**Net Sentinel** is a real-time network event visualization and analysis tool. It ingests firewall logs, parses and enriches them with geolocation and reverse DNS data, and displays the results on an interactive map with filtering and statistics.
 
 > Built for security analysts, network engineers, and curious tinkerers who want to see their network traffic come alive.
 
