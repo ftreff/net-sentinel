@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 Setting up Net Sentinel 2..."
+echo "🔧 Setting up Net Sentinel..."
 
 # Create folders
 mkdir -p data/logs
