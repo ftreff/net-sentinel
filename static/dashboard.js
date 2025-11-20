@@ -1,147 +1,77 @@
 let map;
 let markers = [];
-let polylines = [];
-let currentVerdict = "ALL";
-let currentService = "ALL";
-let showTraces = false;
-let darkMode = true;
-let currentTileLayer = null;
 
 function initMap() {
   map = L.map("map").setView([20, 0], 2);
-  setTileLayer();
-  loadEvents();
 
-  // Poll every 60 seconds
-  setInterval(refreshMap, 60000);
-}
-
-function setTileLayer() {
-  const url = darkMode
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
-
-  const tileLayer = L.tileLayer(url, {
-    attribution: '&copy; OpenStreetMap & CartoDB',
-    subdomains: "abcd",
-    maxZoom: 19,
+  const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
   });
 
-  if (currentTileLayer && map.hasLayer(currentTileLayer)) {
-    map.removeLayer(currentTileLayer);
-  }
+  const light = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+  });
 
-  tileLayer.addTo(map);
-  currentTileLayer = tileLayer;
+  const baseMaps = {
+    Dark: dark,
+    Light: light,
+  };
+
+  dark.addTo(map);
+  L.control.layers(baseMaps).addTo(map);
+
+  loadEvents();
 }
 
 function loadEvents() {
   fetch("/api/events")
     .then((res) => res.json())
     .then((data) => {
-      clearMap();
+      markers.forEach((m) => map.removeLayer(m));
+      markers = [];
 
       data.forEach((event) => {
-        if (event.latitude == null || event.longitude == null) return;
+        if (!event.latitude || !event.longitude) return;
 
-        const latlng = [event.latitude, event.longitude];
-
-        const marker = L.circleMarker(latlng, {
+        const marker = L.circleMarker([event.latitude, event.longitude], {
           radius: 6,
-          fillColor: event.verdict === "DROP" ? "#ff3366" : "#00ffcc",
+          fillColor: event.verdict === "DROP" ? "red" : "lime",
           color: "#000",
           weight: 1,
           opacity: 1,
-          fillOpacity: 0.9,
+          fillOpacity: 0.8,
         });
 
-        marker.verdict = event.verdict;
-        marker.service = event.service;
-
         const popup = `
-          <div class="info-window">
-            <strong>IP:</strong> ${event.ip}<br>
-            <strong>Reverse DNS:</strong> ${event.reverse_dns || "N/A"}<br>
-            <strong>Verdict:</strong> ${event.verdict}<br>
-            <strong>Service:</strong> ${event.service}<br>
-            <strong>Location:</strong> ${event.city}, ${event.country}<br>
-            <strong>Time:</strong> ${event.timestamp}
-          </div>
+          <b>IP:</b> ${event.ip}<br>
+          <b>Reverse DNS:</b> ${event.reverse_dns || "N/A"}<br>
+          <b>Country:</b> ${event.country || "N/A"}<br>
+          <b>City:</b> ${event.city || "N/A"}<br>
+          <b>Port:</b> ${event.port}<br>
+          <b>Service:</b> ${event.service}<br>
+          <b>Verdict:</b> ${event.verdict}<br>
+          <b>Timestamp:</b> ${event.timestamp}<br>
+          <button onclick="refreshReverseDNS('${event.ip}')">🔄 Refresh DNS</button>
         `;
+
         marker.bindPopup(popup);
         marker.addTo(map);
         markers.push(marker);
       });
-
-      updateVisibility();
-      if (showTraces) drawTracesToAlbany();
     });
 }
 
-function clearMap() {
-  markers.forEach((m) => map.removeLayer(m));
-  polylines.forEach((p) => map.removeLayer(p));
-  markers = [];
-  polylines = [];
+function refreshReverseDNS(ip) {
+  fetch(`/api/reverse_dns?ip=${ip}`, { method: "POST" })
+    .then((res) => res.json())
+    .then((data) => {
+      alert(`Updated reverse DNS for ${ip}: ${data.reverse_dns || "N/A"}`);
+      loadEvents(); // reload map with updated data
+    })
+    .catch((err) => {
+      console.error("Reverse DNS update failed:", err);
+      alert("Failed to update reverse DNS.");
+    });
 }
 
-function refreshMap() {
-  loadEvents();
-}
-
-function filterMarkers(verdict) {
-  currentVerdict = verdict;
-  updateVisibility();
-  if (showTraces) drawTracesToAlbany();
-}
-
-function filterByService(service) {
-  currentService = service;
-  updateVisibility();
-  if (showTraces) drawTracesToAlbany();
-}
-
-function updateVisibility() {
-  markers.forEach((marker) => {
-    const verdictMatch = currentVerdict === "ALL" || marker.verdict === currentVerdict;
-    const serviceMatch = currentService === "ALL" || marker.service === currentService;
-    if (verdictMatch && serviceMatch) {
-      marker.addTo(map);
-    } else {
-      map.removeLayer(marker);
-    }
-  });
-
-  polylines.forEach((line) => map.removeLayer(line));
-  polylines = [];
-}
-
-function drawTracesToAlbany() {
-  const albanyLatLng = [42.6526, -73.7562];
-
-  markers.forEach((marker) => {
-    const verdictMatch = currentVerdict === "ALL" || marker.verdict === currentVerdict;
-    const serviceMatch = currentService === "ALL" || marker.service === currentService;
-    if (verdictMatch && serviceMatch) {
-      const line = L.polyline([marker.getLatLng(), albanyLatLng], {
-        color: "#00ffcc",
-        weight: 1,
-        opacity: 0.6,
-      });
-      line.addTo(map);
-      polylines.push(line);
-    }
-  });
-}
-
-function toggleTraces() {
-  showTraces = !showTraces;
-  updateVisibility();
-  if (showTraces) drawTracesToAlbany();
-}
-
-function toggleDarkMode() {
-  darkMode = !darkMode;
-  document.body.classList.toggle("dark");
-  setTileLayer();
-}
+window.onload = initMap;
