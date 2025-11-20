@@ -61,7 +61,7 @@ def get_stats():
             WHERE country IS NOT NULL
             GROUP BY country
             ORDER BY count DESC
-            LIMIT 5
+            LIMIT 10
         """)
     ]
 
@@ -72,7 +72,7 @@ def get_stats():
             FROM ip_events
             GROUP BY port
             ORDER BY count DESC
-            LIMIT 5
+            LIMIT 10
         """)
     ]
 
