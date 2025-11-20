@@ -48,7 +48,7 @@ Then open http://localhost:5000 in your browser.
 
 ## 📁 Project Structure
 ```
-net-sentinel-2/
+net-sentinel/
 ├── setup-log-server.sh   # Script configures rsyslog to receive logs from a router
 ├── setup.sh              # One-time setup script
 ├── ingest.sh             # Runs parser with priority
