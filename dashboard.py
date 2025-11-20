@@ -46,5 +46,37 @@ def refresh_reverse_dns():
         print(f"⚠️ Reverse DNS failed for {ip}: {e}")
         return jsonify({"reverse_dns": None})
 
+@app.route("/api/stats")
+def get_stats():
+    stats = {}
+
+    stats["drop_count"] = conn.execute("SELECT COUNT(*) FROM ip_events WHERE verdict='DROP'").fetchone()[0]
+    stats["accept_count"] = conn.execute("SELECT COUNT(*) FROM ip_events WHERE verdict='ACCEPT'").fetchone()[0]
+
+    stats["top_countries"] = [
+        {"country": row["country"], "count": row["count"]}
+        for row in conn.execute("""
+            SELECT country, COUNT(*) as count
+            FROM ip_events
+            WHERE country IS NOT NULL
+            GROUP BY country
+            ORDER BY count DESC
+            LIMIT 5
+        """)
+    ]
+
+    stats["top_ports"] = [
+        {"port": row["port"], "count": row["count"]}
+        for row in conn.execute("""
+            SELECT port, COUNT(*) as count
+            FROM ip_events
+            GROUP BY port
+            ORDER BY count DESC
+            LIMIT 5
+        """)
+    ]
+
+    return jsonify(stats)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
