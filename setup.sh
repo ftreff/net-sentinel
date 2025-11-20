@@ -1,9 +1,8 @@
 #!/bin/bash
 
-echo "🔧 Setting up Net Sentinel 2..."
+echo "🔧 Setting up Net Sentinel 2 database..."
 
-# Create folders
-mkdir -p data/logs
+# Create folder
 mkdir -p data/geoip
 
 # Create or reset database
