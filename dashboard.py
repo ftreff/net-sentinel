@@ -21,12 +21,17 @@ def static_files(path):
 @app.route("/api/events")
 def get_events():
     since = request.args.get("since")
-    query = "SELECT * FROM ip_events"
+    verdict = request.args.get("verdict")
+    query = "SELECT * FROM ip_events WHERE 1=1"
     params = []
 
     if since:
-        query += " WHERE timestamp >= ?"
+        query += " AND timestamp >= ?"
         params.append(since)
+
+    if verdict in ("DROP", "ACCEPT"):
+        query += " AND verdict = ?"
+        params.append(verdict)
 
     rows = conn.execute(query, params).fetchall()
     return jsonify([dict(row) for row in rows])
