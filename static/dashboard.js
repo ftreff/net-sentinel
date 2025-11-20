@@ -20,11 +20,53 @@ function initMap() {
   dark.addTo(map);
   L.control.layers(baseMaps).addTo(map);
 
-  loadEvents();
+  addTimeFilterControl();
+  loadEvents(); // default: all time
 }
 
-function loadEvents() {
-  fetch("/api/events")
+function addTimeFilterControl() {
+  const control = L.control({ position: "topright" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "time-filter");
+    div.innerHTML = `
+      <select id="timeRange" onchange="onTimeRangeChange()">
+        <option value="">All Time</option>
+        <option value="10min">Last 10 min</option>
+        <option value="1h">Last 1 hour</option>
+        <option value="24h">Last 24 hours</option>
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="90d">Last 90 days</option>
+      </select>
+    `;
+    return div;
+  };
+  control.addTo(map);
+}
+
+function onTimeRangeChange() {
+  const val = document.getElementById("timeRange").value;
+  let since = null;
+
+  if (val) {
+    const now = new Date();
+    if (val === "10min") now.setMinutes(now.getMinutes() - 10);
+    if (val === "1h") now.setHours(now.getHours() - 1);
+    if (val === "24h") now.setHours(now.getHours() - 24);
+    if (val === "7d") now.setDate(now.getDate() - 7);
+    if (val === "30d") now.setDate(now.getDate() - 30);
+    if (val === "90d") now.setDate(now.getDate() - 90);
+    since = now.toISOString();
+  }
+
+  loadEvents(since);
+}
+
+function loadEvents(since = null) {
+  let url = "/api/events";
+  if (since) url += `?since=${encodeURIComponent(since)}`;
+
+  fetch(url)
     .then((res) => res.json())
     .then((data) => {
       markers.forEach((m) => map.removeLayer(m));
@@ -66,7 +108,7 @@ function refreshReverseDNS(ip) {
     .then((res) => res.json())
     .then((data) => {
       alert(`Updated reverse DNS for ${ip}: ${data.reverse_dns || "N/A"}`);
-      loadEvents(); // reload map with updated data
+      onTimeRangeChange(); // reload with current filter
     })
     .catch((err) => {
       console.error("Reverse DNS update failed:", err);
