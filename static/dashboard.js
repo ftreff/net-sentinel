@@ -31,7 +31,7 @@ function addTimeFilterControl() {
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "time-filter");
     div.innerHTML = `
-      <select id="timeRange" onchange="onTimeRangeChange()">
+      <select id="timeRange" onchange="onFilterChange()">
         <option value="">All Time</option>
         <option value="10min">Last 10 min</option>
         <option value="1h">Last 1 hour</option>
@@ -39,6 +39,11 @@ function addTimeFilterControl() {
         <option value="7d">Last 7 days</option>
         <option value="30d">Last 30 days</option>
         <option value="90d">Last 90 days</option>
+      </select>
+      <select id="verdictFilter" onchange="onFilterChange()">
+        <option value="">All Verdicts</option>
+        <option value="ACCEPT">Only ACCEPT</option>
+        <option value="DROP">Only DROP</option>
       </select>
     `;
     return div;
@@ -62,28 +67,33 @@ function addStatsBar() {
   stats.addTo(map);
 }
 
-function onTimeRangeChange() {
-  const val = document.getElementById("timeRange").value;
-  let since = null;
+function onFilterChange() {
+  const timeVal = document.getElementById("timeRange").value;
+  const verdictVal = document.getElementById("verdictFilter").value;
 
-  if (val) {
+  let since = null;
+  if (timeVal) {
     const now = new Date();
-    if (val === "10min") now.setMinutes(now.getMinutes() - 10);
-    if (val === "1h") now.setHours(now.getHours() - 1);
-    if (val === "24h") now.setHours(now.getHours() - 24);
-    if (val === "7d") now.setDate(now.getDate() - 7);
-    if (val === "30d") now.setDate(now.getDate() - 30);
-    if (val === "90d") now.setDate(now.getDate() - 90);
+    if (timeVal === "10min") now.setMinutes(now.getMinutes() - 10);
+    if (timeVal === "1h") now.setHours(now.getHours() - 1);
+    if (timeVal === "24h") now.setHours(now.getHours() - 24);
+    if (timeVal === "7d") now.setDate(now.getDate() - 7);
+    if (timeVal === "30d") now.setDate(now.getDate() - 30);
+    if (timeVal === "90d") now.setDate(now.getDate() - 90);
     since = now.toISOString();
   }
 
-  loadEvents(since);
-  loadStats(); // refresh stats too
+  loadEvents(since, verdictVal);
+  loadStats();
 }
 
-function loadEvents(since = null) {
+function loadEvents(since = null, verdict = null) {
   let url = "/api/events";
-  if (since) url += `?since=${encodeURIComponent(since)}`;
+  const params = [];
+
+  if (since) params.push(`since=${encodeURIComponent(since)}`);
+  if (verdict) params.push(`verdict=${encodeURIComponent(verdict)}`);
+  if (params.length) url += "?" + params.join("&");
 
   fetch(url)
     .then((res) => res.json())
@@ -127,7 +137,7 @@ function refreshReverseDNS(ip) {
     .then((res) => res.json())
     .then((data) => {
       alert(`Updated reverse DNS for ${ip}: ${data.reverse_dns || "N/A"}`);
-      onTimeRangeChange(); // reload with current filter
+      onFilterChange(); // reload with current filters
     })
     .catch((err) => {
       console.error("Reverse DNS update failed:", err);
