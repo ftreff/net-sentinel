@@ -5,7 +5,7 @@ function initMap() {
   map = L.map("map").setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
+    attribution: "&copy; OpenStreetMap contributors & CartoDB",
   });
 
   const light = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -92,7 +92,7 @@ function loadEvents(since = null, verdict = null) {
   const params = [];
 
   if (since) params.push(`since=${encodeURIComponent(since)}`);
-  if (verdict) params.push(`verdict=${encodeURIComponent(verdict)}`);
+  if (verdict && verdict !== "") params.push(`verdict=${encodeURIComponent(verdict)}`);
   if (params.length) url += "?" + params.join("&");
 
   fetch(url)
