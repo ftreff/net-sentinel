@@ -2,7 +2,11 @@ let map;
 let markers = [];
 
 function initMap() {
-  map = L.map("map").setView([20, 0], 2);
+  map = L.map("map", {
+  zoomSnap: 0.25,
+  zoomDelta: 0.25,
+  wheelPxPerZoomLevel: 60 // slower wheel zoom
+}).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap contributors & CartoDB",
