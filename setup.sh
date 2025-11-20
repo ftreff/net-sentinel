@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔧 Setting up Net Sentinel 2 database..."
+echo "🔧 Setting up Net Sentinel database..."
 
 # Create folder
 mkdir -p data/geoip
