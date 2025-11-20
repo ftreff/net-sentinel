@@ -1,23 +1,26 @@
 # Net Sentinel 2
 
-Net Sentinel 2 is a real-time network intelligence dashboard that parses router logs, enriches IP data, and visualizes global intrusion attempts. It combines log analysis, GeoIP mapping, service detection, and traceroute diagnostics into a single interactive interface.
+**Net Sentinel 2** is a real-time network event visualization and analysis tool. It ingests firewall logs, parses and enriches them with geolocation and reverse DNS data, and displays the results on an interactive map with filtering and statistics.
 
-## 🌐 Features
+> Built for security analysts, network engineers, and curious tinkerers who want to see their network traffic come alive.
 
-- 🔍 **Log Parsing**: Extracts IPs, ports, RX/TX direction, timestamps from router logs
-- 🧠 **Data Enrichment**:
-  - Reverse DNS lookup
-  - GeoIP location (city, state, country, lat/lon)
-  - Port-based service guessing (e.g. SSH, HTTP, BitTorrent)
-- 🗃️ **Database Logging**: Stores enriched events in SQLite for querying and visualization
-- 🗺️ **Interactive Dashboard**:
-  - World map with toggleable overlays:
-    - Trace lines
-    - Location dots
-  - Light/dark mode toggle
+---
 
+## 🔍 Features
 
-## ⚙️ Setup
+- 🌍 **Interactive Map** — Visualize incoming connections with geolocated markers and verdict-based color coding
+- 🕵️ **Reverse DNS Lookup** — Click to resolve IPs on demand
+- ⏱️ **Time Filtering** — View events from the last 10 minutes to 90 days
+- ⚖️ **Verdict Filtering** — Toggle between `ACCEPT`, `DROP`, or all events
+- 📊 **Stats Bar** — See top countries, ports, and verdict counts
+- 🧠 **Smart Parsing** — Ingests structured logs and enriches them with GeoIP + reverse DNS
+- 🧩 **Modular Design** — Easily extendable for new data sources or visualizations
+
+---
+
+## 🚀 Getting Started
+
+### 1. ⚙️ Setup
 
 Run the one-time setup script to install dependencies, download GeoIP database, and initialize the SQLite schema:
 
@@ -25,12 +28,31 @@ Run the one-time setup script to install dependencies, download GeoIP database, 
 bash setup.sh
 ```
 
+### 2. 📡 Ingesting Logs
+
+Use ingest.sh to parse logs and populate the database, automatically geolocates IPs and resolves services by port
+
+```bash
+bash ingest.sh
+```
+
+### 3. 🛠 Start the backend
+
+```bash
+python dashboard.py
+```
+
+Then open http://localhost:5000 in your browser.
+
+---
+
 ## 📁 Project Structure
 ```
 net-sentinel-2/
 ├── setup.sh              # One-time setup script
 ├── schema.sql            # SQLite schema
 ├── parser.py             # Log parser and enrichment engine
+├── ingest.sh             # Runs parser.py with priority
 ├── dashboard.py          # Backend API
 ├── static/               # Frontend files
 │   ├── map.html          # Map UI (loads dashboard.js and style.css)
@@ -42,6 +64,8 @@ net-sentinel-2/
 ├── net_sentinel.db       # SQLite database
 └── README.md             # Project overview
 ```
+
+---
 
 ## 🧪 Requirements
 
