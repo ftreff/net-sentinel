@@ -140,12 +140,25 @@ function loadStats() {
     .then((res) => res.json())
     .then((stats) => {
       const div = document.getElementById("statsBar");
+
+      const portService = {
+        21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 80: "http",
+        110: "pop3", 123: "ntp", 143: "imap", 161: "snmp", 443: "https", 445: "smb",
+        465: "smtps", 587: "submission", 993: "imaps", 995: "pop3s", 3306: "mysql",
+        3389: "rdp", 5432: "postgres", 8080: "http-alt"
+      };
+
+      const formatPort = (p) => {
+        const svc = portService[p.port] || "";
+        return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
+      };
+
       div.innerHTML = `
         <b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}<br>
         <b>Top Countries:</b><br>
         ${stats.top_countries.map(c => `&nbsp;&nbsp;${c.country || "N/A"} (${c.count})`).join("<br>")}<br>
         <b>Top Ports:</b><br>
-        ${stats.top_ports.map(p => `&nbsp;&nbsp;${p.port} (${p.count})`).join("<br>")}
+        ${stats.top_ports.map(formatPort).join("<br>")}
       `;
     })
     .catch((err) => {
