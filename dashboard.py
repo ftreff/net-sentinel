@@ -29,9 +29,9 @@ def get_events():
         query += " AND timestamp >= ?"
         params.append(since)
 
-    if verdict in ("DROP", "ACCEPT"):
+    if verdict and verdict.upper() in ("DROP", "ACCEPT"):
         query += " AND verdict = ?"
-        params.append(verdict)
+        params.append(verdict.upper())
 
     rows = conn.execute(query, params).fetchall()
     return jsonify([dict(row) for row in rows])
