@@ -114,8 +114,8 @@ def insert_events(events):
         INSERT INTO ip_events (
             ip, reverse_dns, direction, port, service, timestamp,
             city, state, country, country_code, latitude, longitude,
-            trace_path, verdict
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            trace_path, verdict, hit_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
         ON CONFLICT(ip, port, verdict, direction) DO UPDATE SET
             reverse_dns=excluded.reverse_dns,
             service=excluded.service,
@@ -126,7 +126,8 @@ def insert_events(events):
             country_code=excluded.country_code,
             latitude=excluded.latitude,
             longitude=excluded.longitude,
-            trace_path=excluded.trace_path
+            trace_path=excluded.trace_path,
+            hit_count=hit_count + 1
     """, [(
         e["ip"], e["reverse_dns"], e["direction"], e["port"], e["service"],
         e["timestamp"], e["city"], e["state"], e["country"], e["country_code"],
@@ -162,7 +163,7 @@ def process_logs():
             insert_events(batch)
             inserted += len(batch)
 
-        print(f"\n✅ Finished {filename} — {inserted} events processed (deduplicated on ip/port/verdict/direction)")
+        print(f"\n✅ Finished {filename} — {inserted} events processed (deduplicated with hit counter)")
 
 if __name__ == "__main__":
     process_logs()
