@@ -23,8 +23,9 @@ function initMap() {
 
   addTimeFilterControl();
   addStatsBar();
-  loadEvents(); // default: all time
-  loadStats();  // initial stats
+  addZoomButton();   // new zoom-to-fit control
+  loadEvents();      // default: all time
+  loadStats();       // initial stats
 }
 
 function addTimeFilterControl() {
@@ -66,6 +67,28 @@ function addStatsBar() {
     return div;
   };
   stats.addTo(map);
+}
+
+function addZoomButton() {
+  const control = L.control({ position: "topleft" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    const btn = L.DomUtil.create("a", "", div);
+    btn.innerHTML = "🔍";
+    btn.href = "#";
+    btn.title = "Zoom to fit all markers";
+
+    L.DomEvent.on(btn, "click", function (e) {
+      L.DomEvent.preventDefault(e);
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [20, 20] });
+      }
+    });
+
+    return div;
+  };
+  control.addTo(map);
 }
 
 function onFilterChange() {
