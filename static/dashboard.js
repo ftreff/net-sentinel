@@ -189,45 +189,33 @@ function clearTrace() {
 }
 
 function tracePath(ip) {
-  // 1) Clear prior trace overlays and box
   clearTrace();
 
-  // 2) Fetch new hops
-  fetch(`/api/trace/${ip}`)
+  fetch(`/api/trace?ip=${ip}`)
     .then(res => res.json())
     .then(hops => {
-      // Create trace box
       traceBoxControl = L.control({ position: "bottomright" });
       traceBoxControl.onAdd = function () {
         const div = L.DomUtil.create("div", "stats-bar");
         div.id = "traceBox";
-        div.innerHTML = `
-          <b>Trace path to ${ip}</b><br>
-          <button id="clearTraceBtn">Clear Trace</button><br>
-        `;
-        // Build list similar to stats box
-        div.innerHTML += `<b>Hops:</b><br>`;
-        div.innerHTML += hops.map(h => {
-          const ll = (h.lat != null && h.lon != null) ? `${h.lat.toFixed(4)}, ${h.lon.toFixed(4)}` : "N/A";
-          return `&nbsp;&nbsp;Hop ${h.hop}: ${h.ip || "N/A"} ${h.reverse_dns ? "(" + h.reverse_dns + ")" : ""} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`;
-        }).join("<br>");
+        div.innerHTML = `<b>Trace path to ${ip}</b><br>
+                         <button id="clearTraceBtn">Clear Trace</button><br>`;
+        div.innerHTML += hops.map(h =>
+          `Hop ${h.hop}: ${h.ip} ${h.reverse_dns || ""} — RTT: ${h.rtt || "N/A"} ms — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`
+        ).join("<br>");
         return div;
       };
       traceBoxControl.addTo(map);
 
-      // Wire clear button
-      const clearBtnHandler = () => clearTrace();
-      // Wait for control to render into DOM
       setTimeout(() => {
         const btn = document.getElementById("clearTraceBtn");
-        if (btn) btn.addEventListener("click", clearBtnHandler);
+        if (btn) btn.addEventListener("click", clearTrace);
       }, 0);
 
-      // Plot hop markers and line for those with coordinates
       const latlngs = [];
       hops.forEach(h => {
-        if (h.lat != null && h.lon != null) {
-          const ll = [h.lat, h.lon];
+        if (h.latitude && h.longitude) {
+          const ll = [h.latitude, h.longitude];
           latlngs.push(ll);
 
           const marker = L.circleMarker(ll, {
@@ -241,10 +229,10 @@ function tracePath(ip) {
 
           marker.bindPopup(`
             <b>Hop ${h.hop}</b><br>
-            IP: ${h.ip || "N/A"}<br>
+            IP: ${h.ip}<br>
             Reverse DNS: ${h.reverse_dns || "N/A"}<br>
-            Latitude: ${h.lat != null ? h.lat : "N/A"}<br>
-            Longitude: ${h.lon != null ? h.lon : "N/A"}<br>
+            RTT: ${h.rtt || "N/A"} ms<br>
+            Lat/Lon: ${h.latitude}, ${h.longitude}<br>
             City: ${h.city || "N/A"}<br>
             Region: ${h.region || "N/A"}<br>
             Country: ${h.country || "N/A"}
@@ -259,10 +247,6 @@ function tracePath(ip) {
         traceOverlays.push(line);
         map.fitBounds(latlngs, { padding: [20, 20] });
       }
-    })
-    .catch(err => {
-      console.error("Trace path failed:", err);
-      alert("Failed to fetch trace path.");
     });
 }
 
