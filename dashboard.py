@@ -17,7 +17,7 @@ def get_db():
 # Root route: serve map.html
 @app.route("/")
 def index():
-    return send_from_directory(".", "static/map.html")
+    return send_from_directory(app.static_folder, "map.html")
 
 @app.route("/api/events")
 def get_events():
