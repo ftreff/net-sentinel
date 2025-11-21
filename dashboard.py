@@ -1,65 +1,38 @@
 import os
 import sqlite3
-import socket
-from flask import Flask, jsonify, request, send_from_directory, g
+import datetime
+import subprocess
+import geoip2.database
+from flask import Flask, jsonify, request
+
+DB_PATH = "net_sentinel.db"
+GEOIP_PATH = "data/geoip/GeoLite2-City.mmdb"
 
 app = Flask(__name__)
-DB_PATH = "net_sentinel.db"
 
 def get_db():
-    if "db" not in g:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        g.db = conn
-    return g.db
-
-@app.teardown_appcontext
-def close_db(exception):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
-
-@app.route("/")
-def root():
-    return send_from_directory("static", "map.html")
-
-@app.route("/<path:path>")
-def static_files(path):
-    return send_from_directory("static", path)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 @app.route("/api/events")
 def get_events():
+    db = get_db()
     since = request.args.get("since")
     verdict = request.args.get("verdict")
+
     query = "SELECT * FROM ip_events WHERE 1=1"
     params = []
 
     if since:
         query += " AND timestamp >= ?"
         params.append(since)
-
-    if verdict and verdict.upper() in ("DROP", "ACCEPT"):
+    if verdict:
         query += " AND verdict = ?"
-        params.append(verdict.upper())
+        params.append(verdict)
 
-    rows = get_db().execute(query, params).fetchall()
+    rows = db.execute(query, params).fetchall()
     return jsonify([dict(row) for row in rows])
-
-@app.route("/api/reverse_dns", methods=["POST"])
-def refresh_reverse_dns():
-    data = request.get_json(silent=True) or {}
-    ip = data.get("ip") or request.form.get("ip") or request.args.get("ip")
-    if not ip:
-        return jsonify({"error": "Missing IP"}), 400
-
-    try:
-        rdns = socket.gethostbyaddr(ip)[0]
-        get_db().execute("UPDATE ip_events SET reverse_dns=? WHERE ip=?", (rdns, ip))
-        get_db().commit()
-        return jsonify({"reverse_dns": rdns})
-    except Exception as e:
-        app.logger.warning(f"Reverse DNS failed for {ip}: {e}")
-        return jsonify({"reverse_dns": None})
 
 @app.route("/api/stats")
 def get_stats():
@@ -98,5 +71,43 @@ def get_stats():
 
     return jsonify(stats)
 
+@app.route("/api/reverse_dns", methods=["POST"])
+def reverse_dns():
+    data = request.get_json()
+    ip = data.get("ip")
+    reverse_dns = None
+    try:
+        import socket
+        reverse_dns = socket.gethostbyaddr(ip)[0]
+    except Exception:
+        pass
+
+    db = get_db()
+    db.execute("UPDATE ip_events SET reverse_dns=? WHERE ip=?", (reverse_dns, ip))
+    db.commit()
+    return jsonify({"ip": ip, "reverse_dns": reverse_dns})
+
+@app.route("/api/trace/<ip>")
+def trace(ip):
+    hops = []
+    try:
+        result = subprocess.run(["traceroute", "-n", ip], capture_output=True, text=True)
+        for line in result.stdout.splitlines()[1:]:
+            parts = line.split()
+            if len(parts) >= 2:
+                hop_ip = parts[1]
+                # geolocate hop_ip
+                try:
+                    reader = geoip2.database.Reader(GEOIP_PATH)
+                    resp = reader.city(hop_ip)
+                    if resp.location.latitude and resp.location.longitude:
+                        hops.append({"lat": resp.location.latitude, "lon": resp.location.longitude})
+                    reader.close()
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"Trace failed: {e}")
+    return jsonify(hops)
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)
