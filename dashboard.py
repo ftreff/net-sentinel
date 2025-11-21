@@ -1,9 +1,8 @@
 import os
 import sqlite3
-import datetime
 import subprocess
 import geoip2.database
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 DB_PATH = "net_sentinel.db"
 GEOIP_PATH = "data/geoip/GeoLite2-City.mmdb"
@@ -14,6 +13,11 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+# Root route: serve map.html
+@app.route("/")
+def index():
+    return send_from_directory(".", "map.html")
 
 @app.route("/api/events")
 def get_events():
@@ -111,3 +115,4 @@ def trace(ip):
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
+
