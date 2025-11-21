@@ -142,7 +142,7 @@ def guess_service(port):
 
     if not name:
         warning_msg = f"Unknown port {port} — consider adding to data/services.json"
-        tqdm.write(f"⚠️ {warning_msg}")  # CLI warning without breaking progress bar
+        #tqdm.write(f"⚠️ {warning_msg}")  # CLI warning without breaking progress bar
         logging.warning(warning_msg)      # log file warning
         name = "Unknown"
 
