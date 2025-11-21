@@ -1,6 +1,5 @@
 let map;
 let markers = [];
-
 let traceOverlays = [];
 let traceBoxControl = null;
 
@@ -20,13 +19,14 @@ function initMap() {
   });
 
   const baseMaps = { Dark: dark, Light: light };
-
   dark.addTo(map);
   L.control.layers(baseMaps).addTo(map);
 
   addTimeFilterControl();
   addStatsBar();
   addZoomButton();
+  addClearTracesButton();
+
   loadEvents();
   loadStats();
 }
@@ -66,6 +66,8 @@ function addStatsBar() {
     div.style.padding = "8px";
     div.style.fontSize = "12px";
     div.style.maxWidth = "300px";
+    div.style.maxHeight = "60%";
+    div.style.overflowY = "auto";
     div.innerHTML = "Loading stats...";
     return div;
   };
@@ -87,6 +89,25 @@ function addZoomButton() {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds(), { padding: [20, 20] });
       }
+    });
+
+    return div;
+  };
+  control.addTo(map);
+}
+
+function addClearTracesButton() {
+  const control = L.control({ position: "topleft" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    const btn = L.DomUtil.create("a", "", div);
+    btn.innerHTML = "🧹";
+    btn.href = "#";
+    btn.title = "Clear trace overlays";
+
+    L.DomEvent.on(btn, "click", (e) => {
+      L.DomEvent.preventDefault(e);
+      clearTrace();
     });
 
     return div;
@@ -189,32 +210,43 @@ function clearTrace() {
 }
 
 function tracePath(ip) {
+  // Clear previous overlays and trace box
   clearTrace();
 
-  fetch(`/api/trace?ip=${ip}`)
+  fetch(`/api/trace?ip=${encodeURIComponent(ip)}`)
     .then(res => res.json())
     .then(hops => {
+      // Build trace box (bottom-right), always listing all hops
       traceBoxControl = L.control({ position: "bottomright" });
       traceBoxControl.onAdd = function () {
         const div = L.DomUtil.create("div", "stats-bar");
         div.id = "traceBox";
         div.innerHTML = `<b>Trace path to ${ip}</b><br>
                          <button id="clearTraceBtn">Clear Trace</button><br>`;
-        div.innerHTML += hops.map(h =>
-          `Hop ${h.hop}: ${h.ip} ${h.reverse_dns || ""} — RTT: ${h.rtt || "N/A"} ms — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`
-        ).join("<br>");
+        div.innerHTML += `<b>Hops:</b><br>`;
+        div.innerHTML += hops.map(h => {
+          const ll = (h.latitude != null && h.longitude != null)
+            ? `${Number(h.latitude).toFixed(4)}, ${Number(h.longitude).toFixed(4)}`
+            : "N/A";
+          const name = h.reverse_dns ? `(${h.reverse_dns})` : "";
+          const ipDisp = h.ip || "*";
+          const rttDisp = h.rtt != null ? `${h.rtt} ms` : "N/A";
+          return `&nbsp;&nbsp;Hop ${h.hop}: ${ipDisp} ${name} — RTT: ${rttDisp} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`;
+        }).join("<br>");
         return div;
       };
       traceBoxControl.addTo(map);
 
+      // Wire clear button
       setTimeout(() => {
         const btn = document.getElementById("clearTraceBtn");
         if (btn) btn.addEventListener("click", clearTrace);
       }, 0);
 
+      // Plot hops with coordinates
       const latlngs = [];
       hops.forEach(h => {
-        if (h.latitude && h.longitude) {
+        if (h.latitude != null && h.longitude != null) {
           const ll = [h.latitude, h.longitude];
           latlngs.push(ll);
 
@@ -229,10 +261,11 @@ function tracePath(ip) {
 
           marker.bindPopup(`
             <b>Hop ${h.hop}</b><br>
-            IP: ${h.ip}<br>
+            IP: ${h.ip || "*"}<br>
             Reverse DNS: ${h.reverse_dns || "N/A"}<br>
-            RTT: ${h.rtt || "N/A"} ms<br>
-            Lat/Lon: ${h.latitude}, ${h.longitude}<br>
+            RTT: ${h.rtt != null ? h.rtt : "N/A"} ms<br>
+            Latitude: ${h.latitude != null ? h.latitude : "N/A"}<br>
+            Longitude: ${h.longitude != null ? h.longitude : "N/A"}<br>
             City: ${h.city || "N/A"}<br>
             Region: ${h.region || "N/A"}<br>
             Country: ${h.country || "N/A"}
@@ -247,6 +280,10 @@ function tracePath(ip) {
         traceOverlays.push(line);
         map.fitBounds(latlngs, { padding: [20, 20] });
       }
+    })
+    .catch(err => {
+      console.error("Trace path failed:", err);
+      alert("Failed to fetch trace path.");
     });
 }
 
