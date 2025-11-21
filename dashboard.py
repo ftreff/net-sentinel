@@ -96,19 +96,31 @@ def trace(ip):
     hops = []
     try:
         result = subprocess.run(["traceroute", "-n", ip], capture_output=True, text=True)
-        for line in result.stdout.splitlines()[1:]:
+        for idx, line in enumerate(result.stdout.splitlines()[1:], start=1):
             parts = line.split()
             if len(parts) >= 2:
                 hop_ip = parts[1]
-                # geolocate hop_ip
+                hop_info = {"hop": idx, "ip": hop_ip}
                 try:
                     reader = geoip2.database.Reader(GEOIP_PATH)
                     resp = reader.city(hop_ip)
-                    if resp.location.latitude and resp.location.longitude:
-                        hops.append({"lat": resp.location.latitude, "lon": resp.location.longitude})
+                    hop_info.update({
+                        "lat": resp.location.latitude,
+                        "lon": resp.location.longitude,
+                        "city": resp.city.name,
+                        "region": resp.subdivisions.most_specific.name,
+                        "country": resp.country.name,
+                    })
+                    # reverse DNS
+                    try:
+                        import socket
+                        hop_info["reverse_dns"] = socket.gethostbyaddr(hop_ip)[0]
+                    except Exception:
+                        hop_info["reverse_dns"] = None
                     reader.close()
                 except Exception:
                     pass
+                hops.append(hop_info)
     except Exception as e:
         print(f"Trace failed: {e}")
     return jsonify(hops)
