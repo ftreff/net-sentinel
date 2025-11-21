@@ -2,7 +2,7 @@ let map;
 let markers = [];
 
 let traceOverlays = [];
-let traceBoxControl;
+let traceBoxControl = null;
 
 function initMap() {
   map = L.map("map", {
@@ -179,39 +179,58 @@ function refreshReverseDNS(ip) {
     });
 }
 
-function tracePath(ip) {
-  // Clear previous overlays and box
+function clearTrace() {
   traceOverlays.forEach(layer => map.removeLayer(layer));
   traceOverlays = [];
   if (traceBoxControl) {
     map.removeControl(traceBoxControl);
     traceBoxControl = null;
   }
+}
 
+function tracePath(ip) {
+  // 1) Clear prior trace overlays and box
+  clearTrace();
+
+  // 2) Fetch new hops
   fetch(`/api/trace/${ip}`)
     .then(res => res.json())
     .then(hops => {
-      const latlngs = [];
-
       // Create trace box
       traceBoxControl = L.control({ position: "bottomright" });
       traceBoxControl.onAdd = function () {
         const div = L.DomUtil.create("div", "stats-bar");
         div.id = "traceBox";
-        div.innerHTML = `<b>Trace Path to ${ip}</b><br>`;
-        div.innerHTML += `<button onclick="clearTrace()">Clear Trace</button><br>`;
-        hops.forEach(h => {
-          div.innerHTML += `Hop ${h.hop}: ${h.ip} ${h.reverse_dns || ""} (${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"})<br>`;
-        });
+        div.innerHTML = `
+          <b>Trace path to ${ip}</b><br>
+          <button id="clearTraceBtn">Clear Trace</button><br>
+        `;
+        // Build list similar to stats box
+        div.innerHTML += `<b>Hops:</b><br>`;
+        div.innerHTML += hops.map(h => {
+          const ll = (h.lat != null && h.lon != null) ? `${h.lat.toFixed(4)}, ${h.lon.toFixed(4)}` : "N/A";
+          return `&nbsp;&nbsp;Hop ${h.hop}: ${h.ip || "N/A"} ${h.reverse_dns ? "(" + h.reverse_dns + ")" : ""} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`;
+        }).join("<br>");
         return div;
       };
       traceBoxControl.addTo(map);
 
-      // Plot hops
+      // Wire clear button
+      const clearBtnHandler = () => clearTrace();
+      // Wait for control to render into DOM
+      setTimeout(() => {
+        const btn = document.getElementById("clearTraceBtn");
+        if (btn) btn.addEventListener("click", clearBtnHandler);
+      }, 0);
+
+      // Plot hop markers and line for those with coordinates
+      const latlngs = [];
       hops.forEach(h => {
-        if (h.lat && h.lon) {
-          latlngs.push([h.lat, h.lon]);
-          const marker = L.circleMarker([h.lat, h.lon], {
+        if (h.lat != null && h.lon != null) {
+          const ll = [h.lat, h.lon];
+          latlngs.push(ll);
+
+          const marker = L.circleMarker(ll, {
             radius: 5,
             fillColor: "cyan",
             color: "cyan",
@@ -222,9 +241,10 @@ function tracePath(ip) {
 
           marker.bindPopup(`
             <b>Hop ${h.hop}</b><br>
-            IP: ${h.ip}<br>
+            IP: ${h.ip || "N/A"}<br>
             Reverse DNS: ${h.reverse_dns || "N/A"}<br>
-            Lat/Lon: ${h.lat}, ${h.lon}<br>
+            Latitude: ${h.lat != null ? h.lat : "N/A"}<br>
+            Longitude: ${h.lon != null ? h.lon : "N/A"}<br>
             City: ${h.city || "N/A"}<br>
             Region: ${h.region || "N/A"}<br>
             Country: ${h.country || "N/A"}
@@ -275,15 +295,6 @@ function loadStats() {
     .catch((err) => {
       console.error("Failed to load stats:", err);
     });
-}
-
-function clearTrace() {
-  traceOverlays.forEach(layer => map.removeLayer(layer));
-  traceOverlays = [];
-  if (traceBoxControl) {
-    map.removeControl(traceBoxControl);
-    traceBoxControl = null;
-  }
 }
 
 window.onload = initMap;
