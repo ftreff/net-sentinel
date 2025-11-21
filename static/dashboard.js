@@ -3,10 +3,10 @@ let markers = [];
 
 function initMap() {
   map = L.map("map", {
-  zoomSnap: 0.25,
-  zoomDelta: 0.25,
-  wheelPxPerZoomLevel: 60 // slower wheel zoom
-}).setView([20, 0], 2);
+    zoomSnap: 0.25,
+    zoomDelta: 0.25,
+    wheelPxPerZoomLevel: 60 // slower wheel zoom
+  }).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
     attribution: "&copy; OpenStreetMap contributors & CartoDB",
@@ -16,10 +16,7 @@ function initMap() {
     attribution: "&copy; OpenStreetMap contributors",
   });
 
-  const baseMaps = {
-    Dark: dark,
-    Light: light,
-  };
+  const baseMaps = { Dark: dark, Light: light };
 
   dark.addTo(map);
   L.control.layers(baseMaps).addTo(map);
@@ -78,12 +75,12 @@ function onFilterChange() {
   let since = null;
   if (timeVal) {
     const now = new Date();
-    if (timeVal === "10min") now.setMinutes(now.getMinutes() - 10);
-    if (timeVal === "1h") now.setHours(now.getHours() - 1);
-    if (timeVal === "24h") now.setHours(now.getHours() - 24);
-    if (timeVal === "7d") now.setDate(now.getDate() - 7);
-    if (timeVal === "30d") now.setDate(now.getDate() - 30);
-    if (timeVal === "90d") now.setDate(now.getDate() - 90);
+    if (timeVal === "10min") now.setTime(now.getTime() - 10 * 60 * 1000);
+    if (timeVal === "1h") now.setTime(now.getTime() - 60 * 60 * 1000);
+    if (timeVal === "24h") now.setTime(now.getTime() - 24 * 60 * 60 * 1000);
+    if (timeVal === "7d") now.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (timeVal === "30d") now.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (timeVal === "90d") now.setTime(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     since = now.toISOString();
   }
 
@@ -94,7 +91,6 @@ function onFilterChange() {
 function loadEvents(since = null, verdict = null) {
   let url = "/api/events";
   const params = [];
-
   if (since) params.push(`since=${encodeURIComponent(since)}`);
   if (verdict && verdict !== "") params.push(`verdict=${encodeURIComponent(verdict)}`);
   if (params.length) url += "?" + params.join("&");
@@ -133,11 +129,18 @@ function loadEvents(since = null, verdict = null) {
         marker.addTo(map);
         markers.push(marker);
       });
+    })
+    .catch((err) => {
+      console.error("Failed to load events:", err);
     });
 }
 
 function refreshReverseDNS(ip) {
-  fetch(`/api/reverse_dns?ip=${ip}`, { method: "POST" })
+  fetch(`/api/reverse_dns`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ip })
+  })
     .then((res) => res.json())
     .then((data) => {
       alert(`Updated reverse DNS for ${ip}: ${data.reverse_dns || "N/A"}`);
