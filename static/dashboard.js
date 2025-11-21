@@ -1,6 +1,9 @@
 let map;
 let markers = [];
 
+let traceOverlays = [];
+let traceBoxControl;
+
 function initMap() {
   map = L.map("map", {
     zoomSnap: 0.25,
@@ -177,14 +180,38 @@ function refreshReverseDNS(ip) {
 }
 
 function tracePath(ip) {
+  // Clear previous overlays and box
+  traceOverlays.forEach(layer => map.removeLayer(layer));
+  traceOverlays = [];
+  if (traceBoxControl) {
+    map.removeControl(traceBoxControl);
+    traceBoxControl = null;
+  }
+
   fetch(`/api/trace/${ip}`)
     .then(res => res.json())
     .then(hops => {
       const latlngs = [];
+
+      // Create trace box
+      traceBoxControl = L.control({ position: "bottomright" });
+      traceBoxControl.onAdd = function () {
+        const div = L.DomUtil.create("div", "stats-bar");
+        div.id = "traceBox";
+        div.innerHTML = `<b>Trace Path to ${ip}</b><br>`;
+        div.innerHTML += `<button onclick="clearTrace()">Clear Trace</button><br>`;
+        hops.forEach(h => {
+          div.innerHTML += `Hop ${h.hop}: ${h.ip} ${h.reverse_dns || ""} (${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"})<br>`;
+        });
+        return div;
+      };
+      traceBoxControl.addTo(map);
+
+      // Plot hops
       hops.forEach(h => {
         if (h.lat && h.lon) {
           latlngs.push([h.lat, h.lon]);
-          L.circleMarker([h.lat, h.lon], {
+          const marker = L.circleMarker([h.lat, h.lon], {
             radius: 5,
             fillColor: "cyan",
             color: "cyan",
@@ -192,10 +219,24 @@ function tracePath(ip) {
             opacity: 1,
             fillOpacity: 0.8,
           }).addTo(map);
+
+          marker.bindPopup(`
+            <b>Hop ${h.hop}</b><br>
+            IP: ${h.ip}<br>
+            Reverse DNS: ${h.reverse_dns || "N/A"}<br>
+            Lat/Lon: ${h.lat}, ${h.lon}<br>
+            City: ${h.city || "N/A"}<br>
+            Region: ${h.region || "N/A"}<br>
+            Country: ${h.country || "N/A"}
+          `);
+
+          traceOverlays.push(marker);
         }
       });
+
       if (latlngs.length > 1) {
-        L.polyline(latlngs, { color: "cyan", weight: 2 }).addTo(map);
+        const line = L.polyline(latlngs, { color: "cyan", weight: 2 }).addTo(map);
+        traceOverlays.push(line);
         map.fitBounds(latlngs, { padding: [20, 20] });
       }
     })
@@ -234,6 +275,15 @@ function loadStats() {
     .catch((err) => {
       console.error("Failed to load stats:", err);
     });
+}
+
+function clearTrace() {
+  traceOverlays.forEach(layer => map.removeLayer(layer));
+  traceOverlays = [];
+  if (traceBoxControl) {
+    map.removeControl(traceBoxControl);
+    traceBoxControl = null;
+  }
 }
 
 window.onload = initMap;
