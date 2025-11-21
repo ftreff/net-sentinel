@@ -15,11 +15,11 @@ CREATE TABLE IF NOT EXISTS ip_events (
     latitude REAL,
     longitude REAL,
     trace_path TEXT,  -- optional: comma-separated hops or JSON array
-    verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT'))  -- packet status
+    verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT')),  -- packet status
+    hit_count INTEGER DEFAULT 1  -- new: frequency counter
 );
 
--- Deduplication: ensure we keep only one row per ip/port/verdict/direction
--- Parser should use ON CONFLICT DO UPDATE to overwrite with the newest timestamp/metadata
+-- Deduplication: ensure only one row per ip/port/verdict/direction
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_event
 ON ip_events(ip, port, verdict, direction);
 
