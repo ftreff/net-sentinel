@@ -26,14 +26,14 @@ def parse_line(line):
         ip = dst_match.group(1)
         port = int(spt_match.group(1))
 
-    # crude syslog timestamp parsing
+    # syslog timestamp parsing (no year included)
     ts_match = re.search(r"\w{3}\s+\d+\s[\d:]+", line)
     if ts_match:
         try:
             ts = datetime.datetime.strptime(ts_match.group(0), "%b %d %H:%M:%S")
             now = datetime.datetime.now()
-            # adjust year: if parsed month > current month and we are in Jan, roll back
             year = now.year
+            # adjust for year rollover: if parsed month > current month and we are in January, roll back
             if ts.month > now.month and now.month == 1:
                 year -= 1
             timestamp = ts.replace(year=year)
@@ -46,30 +46,9 @@ def parse_line(line):
         return (ip, port, verdict, direction, timestamp, line.strip())
     return None
 
-def load_existing_groups():
-    groups = defaultdict(lambda: {"count": 0, "timestamp": None, "line": None})
-    if not os.path.exists(OUTPUT_PATH):
-        return groups
-    with open(OUTPUT_PATH, "r") as f:
-        for line in f:
-            hit_match = re.search(r"HITCOUNT=(\d+)", line)
-            ts_match = re.search(r"LASTTS=([\d\-:T]+)", line)
-            parsed = parse_line(line)
-            if not parsed:
-                continue
-            ip, port, verdict, direction, _, raw_line = parsed
-            key = (ip, port, verdict, direction)
-            count = int(hit_match.group(1)) if hit_match else 1
-            ts = ts_match.group(1) if ts_match else None
-            groups[key]["count"] += count
-            groups[key]["timestamp"] = ts
-            groups[key]["line"] = raw_line
-    return groups
-
 def dedupe_log():
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
-    groups = load_existing_groups()
-    keep_lines = []
+    groups = defaultdict(lambda: {"count": 0, "timestamp": None, "line": None})
 
     with open(LOG_PATH, "r") as f:
         for line in f:
@@ -77,13 +56,15 @@ def dedupe_log():
             if not parsed:
                 continue
             ip, port, verdict, direction, timestamp, raw_line = parsed
+
             if timestamp >= cutoff:
+                # keep recent lines untouched
                 keep_lines.append(line)
             else:
                 key = (ip, port, verdict, direction)
                 groups[key]["count"] += 1
-                if (groups[key]["timestamp"] is None or timestamp.isoformat() > groups[key]["timestamp"]):
-                    groups[key]["timestamp"] = timestamp.isoformat()
+                if (groups[key]["timestamp"] is None or timestamp > groups[key]["timestamp"]):
+                    groups[key]["timestamp"] = timestamp
                 groups[key]["line"] = raw_line
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -91,7 +72,8 @@ def dedupe_log():
     # write grouped log
     with open(OUTPUT_PATH, "w") as out:
         for key, data in groups.items():
-            out.write(f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp']}\n")
+            ip, port, verdict, direction = key
+            out.write(f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp'].isoformat()}\n")
 
     # atomic rewrite of router.log
     tmp_path = LOG_PATH + ".tmp"
@@ -103,4 +85,6 @@ def dedupe_log():
     print(f"➡️ Router log truncated to last 7 days.")
 
 if __name__ == "__main__":
+    keep_lines = []
     dedupe_log()
+
