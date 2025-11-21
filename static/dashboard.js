@@ -215,6 +215,8 @@ function tracePath(ip) {
   fetch(`/api/trace?ip=${encodeURIComponent(ip)}`)
     .then(res => res.json())
     .then(hops => {
+      console.log("Trace hops:", hops); // debug log
+
       // Build trace box
       traceBoxControl = L.control({ position: "bottomright" });
       traceBoxControl.onAdd = function () {
@@ -223,15 +225,15 @@ function tracePath(ip) {
         div.innerHTML = `<b>Trace path to ${ip}</b><br>
                          <button id="clearTraceBtn">Clear Trace</button><br>`;
         div.innerHTML += `<b>Hops:</b><br>`;
-        div.innerHTML += hops.map(h => {
+        hops.forEach(h => {
           const ipDisp = h.ip || "* (timeout)";
           const name = h.reverse_dns ? `(${h.reverse_dns})` : "";
           const rttDisp = h.rtt != null ? `${h.rtt} ms` : "N/A";
           const ll = (h.latitude != null && h.longitude != null)
             ? `${Number(h.latitude).toFixed(4)}, ${Number(h.longitude).toFixed(4)}`
             : "N/A";
-          return `&nbsp;&nbsp;Hop ${h.hop}: ${ipDisp} ${name} — RTT: ${rttDisp} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`;
-        }).join("<br>");
+          div.innerHTML += `&nbsp;&nbsp;Hop ${h.hop}: ${ipDisp} ${name} — RTT: ${rttDisp} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}<br>`;
+        });
         return div;
       };
       traceBoxControl.addTo(map);
