@@ -1,11 +1,17 @@
 import os
 import sqlite3
 import subprocess
+import re
+import socket
 import geoip2.database
 from flask import Flask, jsonify, request, send_from_directory
 
 DB_PATH = "net_sentinel.db"
 GEOIP_PATH = "data/geoip/GeoLite2-City.mmdb"
+
+ALBANY_COORDS = (42.6526, -73.7562)  # Albany, NY
+
+IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
 app = Flask(__name__)
 
@@ -94,35 +100,71 @@ def reverse_dns():
 @app.route("/api/trace/<ip>")
 def trace(ip):
     hops = []
+    reader = None
     try:
         result = subprocess.run(["traceroute", "-n", ip], capture_output=True, text=True)
-        for idx, line in enumerate(result.stdout.splitlines()[1:], start=1):
-            parts = line.split()
-            if len(parts) >= 2:
-                hop_ip = parts[1]
-                hop_info = {"hop": idx, "ip": hop_ip}
+        lines = result.stdout.splitlines()
+        # Fallback: if traceroute without -n is preferred, remove -n above.
+        if not lines or len(lines) < 2:
+            return jsonify(hops)
+
+        try:
+            reader = geoip2.database.Reader(GEOIP_PATH)
+        except Exception:
+            reader = None
+
+        for idx, raw in enumerate(lines[1:], start=1):
+            # Extract first IPv4 on the line (handles: "8 host (1.2.3.4)" or "8 1.2.3.4")
+            m = IPV4_RE.search(raw)
+            hop_ip = m.group(0) if m else None
+
+            hop_info = {
+                "hop": idx,
+                "ip": hop_ip,
+                "reverse_dns": None,
+                "lat": None,
+                "lon": None,
+                "city": None,
+                "region": None,
+                "country": None,
+            }
+
+            if hop_ip:
+                # Reverse DNS (best-effort)
                 try:
-                    reader = geoip2.database.Reader(GEOIP_PATH)
-                    resp = reader.city(hop_ip)
-                    hop_info.update({
-                        "lat": resp.location.latitude,
-                        "lon": resp.location.longitude,
-                        "city": resp.city.name,
-                        "region": resp.subdivisions.most_specific.name,
-                        "country": resp.country.name,
-                    })
-                    # reverse DNS
-                    try:
-                        import socket
-                        hop_info["reverse_dns"] = socket.gethostbyaddr(hop_ip)[0]
-                    except Exception:
-                        hop_info["reverse_dns"] = None
-                    reader.close()
+                    hop_info["reverse_dns"] = socket.gethostbyaddr(hop_ip)[0]
                 except Exception:
                     pass
-                hops.append(hop_info)
+
+                # GeoIP (best-effort)
+                if reader:
+                    try:
+                        resp = reader.city(hop_ip)
+                        hop_info["lat"] = resp.location.latitude
+                        hop_info["lon"] = resp.location.longitude
+                        hop_info["city"] = resp.city.name
+                        hop_info["region"] = resp.subdivisions.most_specific.name
+                        hop_info["country"] = resp.country.name
+                    except Exception:
+                        pass
+
+            # Force hop 1 to Albany
+            if idx == 1:
+                hop_info["lat"], hop_info["lon"] = ALBANY_COORDS
+                hop_info["city"] = hop_info["city"] or "Albany"
+                hop_info["region"] = hop_info["region"] or "New York"
+                hop_info["country"] = hop_info["country"] or "United States"
+
+            hops.append(hop_info)
     except Exception as e:
         print(f"Trace failed: {e}")
+    finally:
+        if reader:
+            try:
+                reader.close()
+            except Exception:
+                pass
+
     return jsonify(hops)
 
 if __name__ == "__main__":
