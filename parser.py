@@ -5,6 +5,9 @@ import socket
 import datetime
 import geoip2.database
 from tqdm import tqdm
+import sys
+import logging
+import json
 
 LOG_DIR = "/var/log"
 GROUPED_LOG = "logs/grouped-router.log"  # deduped log in project folder
@@ -13,6 +16,13 @@ GEOIP_PATH = "data/geoip/GeoLite2-City.mmdb"
 
 geoip_cache = {}
 dns_cache = {}
+
+# configure logging for warnings
+logging.basicConfig(
+    filename="parser-warnings.log",
+    level=logging.WARNING,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
 
 def parse_log_line(line):
     src_match = re.search(r"SRC=([\d\.]+)", line)
@@ -62,13 +72,11 @@ def reverse_dns(ip):
 def guess_service(port):
     # Load from external JSON if available
     try:
-        import json
         with open("data/services.json", "r") as f:
             common = json.load(f)
     except:
         common = {}
 
-    # Fallback defaults if not in JSON
     defaults = {
         22: "SSH", 23: "Telnet", 3389: "RDP", 5900: "VNC",
         25: "SMTP", 465: "SMTP SSL", 587: "SMTP Submission",
@@ -77,7 +85,14 @@ def guess_service(port):
         445: "SMB/Samba", 20: "FTP-Data", 21: "FTP"
     }
 
-    name = common.get(str(port), defaults.get(port, "Unknown"))
+    name = common.get(str(port), defaults.get(port))
+
+    if not name:
+        warning_msg = f"Unknown port {port} — consider adding to data/services.json"
+        print(f"⚠️ {warning_msg}", file=sys.stderr)  # CLI warning
+        logging.warning(warning_msg)  # log file warning
+        name = "Unknown"
+
     return f"{name} ({port})"
 
 def geoip_lookup(ip):
