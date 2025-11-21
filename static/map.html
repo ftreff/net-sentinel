@@ -4,9 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Net Sentinel Map</title>
+  <meta name="description" content="Net Sentinel interactive map of intrusion attempts and network events." />
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha512-sA+e2v5Zp+0pYqvXqkzFhXQFZQhQfYzZkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQ=="
+    crossorigin=""
   />
   <style>
     html, body, #map {
@@ -15,21 +18,39 @@
     }
 
     .time-filter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
       background: rgba(0, 0, 0, 0.7);
       padding: 6px;
       color: white;
       font-size: 13px;
+      border-radius: 4px;
+      z-index: 1000;
     }
 
     .stats-bar {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 6px;
+      color: white;
+      font-size: 13px;
       line-height: 1.4;
+      border-radius: 4px;
+      z-index: 1000;
     }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="time-filter" class="time-filter">Loading time filter...</div>
+  <div id="stats" class="stats-bar">Loading stats...</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha512-vZ8NwYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQzYkzQ=="
+          crossorigin=""></script>
   <script src="dashboard.js"></script>
 </body>
 </html>
