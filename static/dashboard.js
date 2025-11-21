@@ -5,7 +5,7 @@ function initMap() {
   map = L.map("map", {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
-    wheelPxPerZoomLevel: 60 // slower wheel zoom
+    wheelPxPerZoomLevel: 60
   }).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -23,9 +23,9 @@ function initMap() {
 
   addTimeFilterControl();
   addStatsBar();
-  addZoomButton();   // new zoom-to-fit control
-  loadEvents();      // default: all time
-  loadStats();       // initial stats
+  addZoomButton();
+  loadEvents();
+  loadStats();
 }
 
 function addTimeFilterControl() {
@@ -146,6 +146,7 @@ function loadEvents(since = null, verdict = null) {
           <b>Verdict:</b> ${event.verdict}<br>
           <b>Timestamp:</b> ${event.timestamp}<br>
           <button onclick="refreshReverseDNS('${event.ip}')">🔄 Refresh DNS</button>
+          <button onclick="tracePath('${event.ip}')">🛤️ Trace Path</button>
         `;
 
         marker.bindPopup(popup);
@@ -172,6 +173,35 @@ function refreshReverseDNS(ip) {
     .catch((err) => {
       console.error("Reverse DNS update failed:", err);
       alert("Failed to update reverse DNS.");
+    });
+}
+
+function tracePath(ip) {
+  fetch(`/api/trace/${ip}`)
+    .then(res => res.json())
+    .then(hops => {
+      const latlngs = [];
+      hops.forEach(h => {
+        if (h.lat && h.lon) {
+          latlngs.push([h.lat, h.lon]);
+          L.circleMarker([h.lat, h.lon], {
+            radius: 5,
+            fillColor: "cyan",
+            color: "cyan",
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8,
+          }).addTo(map);
+        }
+      });
+      if (latlngs.length > 1) {
+        L.polyline(latlngs, { color: "cyan", weight: 2 }).addTo(map);
+        map.fitBounds(latlngs, { padding: [20, 20] });
+      }
+    })
+    .catch(err => {
+      console.error("Trace path failed:", err);
+      alert("Failed to fetch trace path.");
     });
 }
 
