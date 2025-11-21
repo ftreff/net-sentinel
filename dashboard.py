@@ -1,14 +1,23 @@
 import os
 import sqlite3
 import socket
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, g
 
 app = Flask(__name__)
 DB_PATH = "net_sentinel.db"
 
-# Global DB connection
-conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-conn.row_factory = sqlite3.Row
+def get_db():
+    if "db" not in g:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        g.db = conn
+    return g.db
+
+@app.teardown_appcontext
+def close_db(exception):
+    db = g.pop("db", None)
+    if db is not None:
+        db.close()
 
 @app.route("/")
 def root():
@@ -33,35 +42,37 @@ def get_events():
         query += " AND verdict = ?"
         params.append(verdict.upper())
 
-    rows = conn.execute(query, params).fetchall()
+    rows = get_db().execute(query, params).fetchall()
     return jsonify([dict(row) for row in rows])
 
 @app.route("/api/reverse_dns", methods=["POST"])
 def refresh_reverse_dns():
-    ip = request.args.get("ip")
+    data = request.get_json(silent=True) or {}
+    ip = data.get("ip") or request.form.get("ip") or request.args.get("ip")
     if not ip:
         return jsonify({"error": "Missing IP"}), 400
 
     try:
         rdns = socket.gethostbyaddr(ip)[0]
-        conn.execute("UPDATE ip_events SET reverse_dns=? WHERE ip=?", (rdns, ip))
-        conn.commit()
+        get_db().execute("UPDATE ip_events SET reverse_dns=? WHERE ip=?", (rdns, ip))
+        get_db().commit()
         return jsonify({"reverse_dns": rdns})
     except Exception as e:
-        print(f"⚠️ Reverse DNS failed for {ip}: {e}")
+        app.logger.warning(f"Reverse DNS failed for {ip}: {e}")
         return jsonify({"reverse_dns": None})
 
 @app.route("/api/stats")
 def get_stats():
+    db = get_db()
     stats = {}
 
-    stats["drop_count"] = conn.execute("SELECT COUNT(*) FROM ip_events WHERE verdict='DROP'").fetchone()[0]
-    stats["accept_count"] = conn.execute("SELECT COUNT(*) FROM ip_events WHERE verdict='ACCEPT'").fetchone()[0]
+    stats["drop_count"] = db.execute("SELECT SUM(hit_count) FROM ip_events WHERE verdict='DROP'").fetchone()[0] or 0
+    stats["accept_count"] = db.execute("SELECT SUM(hit_count) FROM ip_events WHERE verdict='ACCEPT'").fetchone()[0] or 0
 
     stats["top_countries"] = [
         {"country": row["country"], "count": row["count"]}
-        for row in conn.execute("""
-            SELECT country, COUNT(*) as count
+        for row in db.execute("""
+            SELECT country, SUM(hit_count) as count
             FROM ip_events
             WHERE country IS NOT NULL
             GROUP BY country
@@ -72,8 +83,8 @@ def get_stats():
 
     stats["top_ports"] = [
         {"port": row["port"], "count": row["count"]}
-        for row in conn.execute("""
-            SELECT port, COUNT(*) as count
+        for row in db.execute("""
+            SELECT port, SUM(hit_count) as count
             FROM ip_events
             GROUP BY port
             ORDER BY count DESC
