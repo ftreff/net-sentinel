@@ -66,8 +66,12 @@ def get_stats():
     db = get_db()
     stats = {}
 
-    stats["drop_count"] = db.execute("SELECT SUM(hit_count) FROM ip_events WHERE verdict='DROP'").fetchone()[0] or 0
-    stats["accept_count"] = db.execute("SELECT SUM(hit_count) FROM ip_events WHERE verdict='ACCEPT'").fetchone()[0] or 0
+    stats["drop_count"] = db.execute(
+        "SELECT SUM(hit_count) FROM ip_events WHERE verdict='DROP'"
+    ).fetchone()[0] or 0
+    stats["accept_count"] = db.execute(
+        "SELECT SUM(hit_count) FROM ip_events WHERE verdict='ACCEPT'"
+    ).fetchone()[0] or 0
 
     stats["top_countries"] = [
         {"country": row["country"], "count": row["count"]}
@@ -77,7 +81,7 @@ def get_stats():
             WHERE country IS NOT NULL
             GROUP BY country
             ORDER BY count DESC
-            LIMIT 10
+            LIMIT 15
         """)
     ]
 
@@ -88,7 +92,7 @@ def get_stats():
             FROM ip_events
             GROUP BY port
             ORDER BY count DESC
-            LIMIT 10
+            LIMIT 15
         """)
     ]
 
