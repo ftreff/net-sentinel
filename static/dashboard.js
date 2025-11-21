@@ -210,13 +210,12 @@ function clearTrace() {
 }
 
 function tracePath(ip) {
-  // Clear previous overlays and trace box
   clearTrace();
 
   fetch(`/api/trace?ip=${encodeURIComponent(ip)}`)
     .then(res => res.json())
     .then(hops => {
-      // Build trace box (bottom-right), always listing all hops
+      // Build trace box
       traceBoxControl = L.control({ position: "bottomright" });
       traceBoxControl.onAdd = function () {
         const div = L.DomUtil.create("div", "stats-bar");
@@ -225,19 +224,18 @@ function tracePath(ip) {
                          <button id="clearTraceBtn">Clear Trace</button><br>`;
         div.innerHTML += `<b>Hops:</b><br>`;
         div.innerHTML += hops.map(h => {
+          const ipDisp = h.ip || "* (timeout)";
+          const name = h.reverse_dns ? `(${h.reverse_dns})` : "";
+          const rttDisp = h.rtt != null ? `${h.rtt} ms` : "N/A";
           const ll = (h.latitude != null && h.longitude != null)
             ? `${Number(h.latitude).toFixed(4)}, ${Number(h.longitude).toFixed(4)}`
             : "N/A";
-          const name = h.reverse_dns ? `(${h.reverse_dns})` : "";
-          const ipDisp = h.ip || "*";
-          const rttDisp = h.rtt != null ? `${h.rtt} ms` : "N/A";
           return `&nbsp;&nbsp;Hop ${h.hop}: ${ipDisp} ${name} — RTT: ${rttDisp} — ${ll} — ${h.city || "?"}, ${h.region || "?"}, ${h.country || "?"}`;
         }).join("<br>");
         return div;
       };
       traceBoxControl.addTo(map);
 
-      // Wire clear button
       setTimeout(() => {
         const btn = document.getElementById("clearTraceBtn");
         if (btn) btn.addEventListener("click", clearTrace);
@@ -261,7 +259,7 @@ function tracePath(ip) {
 
           marker.bindPopup(`
             <b>Hop ${h.hop}</b><br>
-            IP: ${h.ip || "*"}<br>
+            IP: ${h.ip || "* (timeout)"}<br>
             Reverse DNS: ${h.reverse_dns || "N/A"}<br>
             RTT: ${h.rtt != null ? h.rtt : "N/A"} ms<br>
             Latitude: ${h.latitude != null ? h.latitude : "N/A"}<br>
