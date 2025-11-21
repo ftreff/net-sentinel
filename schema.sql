@@ -15,11 +15,21 @@ CREATE TABLE IF NOT EXISTS ip_events (
     latitude REAL,
     longitude REAL,
     trace_path TEXT,  -- optional: comma-separated hops or JSON array
-    verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT'))  -- new: packet status
+    verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT'))  -- packet status
 );
+
+-- Deduplication: ensure we keep only one row per ip/port/verdict/direction
+-- Parser should use ON CONFLICT DO UPDATE to overwrite with the newest timestamp/metadata
+CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_event
+ON ip_events(ip, port, verdict, direction);
 
 -- Optional index for faster country-based queries
 CREATE INDEX IF NOT EXISTS idx_country_code ON ip_events(country_code);
 
 -- Optional index for timestamp filtering
 CREATE INDEX IF NOT EXISTS idx_timestamp ON ip_events(timestamp);
+
+-- Helpful composite indexes for common dashboard filters
+CREATE INDEX IF NOT EXISTS idx_verdict_timestamp ON ip_events(verdict, timestamp);
+CREATE INDEX IF NOT EXISTS idx_port_timestamp ON ip_events(port, timestamp);
+CREATE INDEX IF NOT EXISTS idx_direction_timestamp ON ip_events(direction, timestamp);
