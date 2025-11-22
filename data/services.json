@@ -119,6 +119,7 @@
   "16000": "Mining-alt",
   "16384": "RTP-start",
   "16666": "XMR Mining",
+  "16881": "BitTorrent"
   "18081": "Monero RPC",
   "18082": "Monero Wallet",
   "18089": "Monero ZMQ",
@@ -135,4 +136,6 @@
   "50000": "VPN-alt",
   "51820": "WireGuard",
   "53000": "Custom-HTTP"
+  "58169": "dynamic port [
+  "63783": "BitTorrent"
 }
