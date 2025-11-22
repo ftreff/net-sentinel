@@ -127,6 +127,22 @@ function addTimeFilterControl() {
   control.addTo(map);
 }
 
+function addStatsBar() {
+  const control = L.control({ position: "bottomleft" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "stats-bar");
+    div.id = "statsBar";
+    div.style.background = "rgba(0,0,0,0.7)";
+    div.style.color = "white";
+    div.style.padding = "6px";
+    div.style.fontSize = "12px";
+    div.style.maxHeight = "200px";
+    div.style.overflowY = "auto";
+    return div;
+  };
+  control.addTo(map);
+}
+
 function addZoomButton() {
   const control = L.control({ position: "topleft" });
   control.onAdd = function () {
