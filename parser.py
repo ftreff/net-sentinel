@@ -233,13 +233,20 @@ def insert_events(events):
         c = conn.cursor()
         c.executemany("""
             INSERT INTO ip_events (
-                ip, reverse_dns, direction, port, service, timestamp,
+                src_ip, src_rdns, src_port, src_service,
+                dst_ip, dst_rdns, dst_port, dst_service,
+                proto, in_if, out_if,
+                verdict, direction,
+                timestamp, hit_count,
                 city, state, country, country_code, latitude, longitude,
-                trace_path, verdict, hit_count
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(ip, port, verdict, direction) DO UPDATE SET
-                reverse_dns=excluded.reverse_dns,
-                service=excluded.service,
+                trace_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(src_ip, dst_ip, src_port, dst_port, proto, verdict, direction)
+            DO UPDATE SET
+                src_rdns=excluded.src_rdns,
+                dst_rdns=excluded.dst_rdns,
+                src_service=excluded.src_service,
+                dst_service=excluded.dst_service,
                 timestamp=excluded.timestamp,
                 city=excluded.city,
                 state=excluded.state,
@@ -250,9 +257,14 @@ def insert_events(events):
                 trace_path=excluded.trace_path,
                 hit_count=hit_count + excluded.hit_count
         """, [(
-            e["ip"], e["reverse_dns"], e["direction"], e["port"], e["service"],
-            e["timestamp"], e["city"], e["state"], e["country"], e["country_code"],
-            e["latitude"], e["longitude"], e["trace_path"], e["verdict"], e["hit_count"]
+            e.get("src_ip"), e.get("src_rdns"), e.get("src_port"), e.get("src_service"),
+            e.get("dst_ip"), e.get("dst_rdns"), e.get("dst_port"), e.get("dst_service"),
+            e.get("proto"), e.get("in_if"), e.get("out_if"),
+            e.get("verdict"), e.get("direction"),
+            e.get("timestamp"), e.get("hit_count"),
+            e.get("city"), e.get("state"), e.get("country"), e.get("country_code"),
+            e.get("latitude"), e.get("longitude"),
+            e.get("trace_path")
         ) for e in events])
         conn.commit()
     finally:
