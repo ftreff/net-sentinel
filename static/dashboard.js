@@ -20,7 +20,12 @@ function initMap() {
   const baseMaps = { Dark: dark, Light: light };
 
   dark.addTo(map);
-  L.control.layers(baseMaps).addTo(map);
+
+  // Basemap toggle moved to top-left
+  L.control.layers(baseMaps, null, { position: "topleft" }).addTo(map);
+
+  // Add zoom controls explicitly to top-left
+  L.control.zoom({ position: "topleft" }).addTo(map);
 
   addTimeFilterControl();
   addStatsBar();
@@ -44,8 +49,9 @@ function initMap() {
 function addTimeFilterControl() {
   const control = L.control({ position: "topright" });
   control.onAdd = function () {
-    const div = L.DomUtil.create("div", "time-filter");
+    const div = L.DomUtil.create("div", "filter-box");
     div.innerHTML = `
+      <!-- Time filter -->
       <select id="timeRange" onchange="onFilterChange()">
         <option value="">All Time</option>
         <option value="10min">Last 10 min</option>
@@ -55,31 +61,71 @@ function addTimeFilterControl() {
         <option value="30d">Last 30 days</option>
         <option value="90d">Last 90 days</option>
       </select>
+
+      <!-- Verdict filter -->
       <select id="verdictFilter" onchange="onFilterChange()">
         <option value="">All Verdicts</option>
         <option value="ACCEPT">Only ACCEPT</option>
         <option value="DROP">Only DROP</option>
       </select>
+
+      <!-- Protocol filter -->
+      <select id="protoFilter" onchange="onFilterChange()">
+        <option value="">All Protocols</option>
+        <option value="TCP">TCP</option>
+        <option value="UDP">UDP</option>
+        <option value="ICMP">ICMP</option>
+      </select>
+
+      <!-- Direction filter -->
+      <select id="directionFilter" onchange="onFilterChange()">
+        <option value="">All Directions</option>
+        <option value="INBOUND">Inbound</option>
+        <option value="OUTBOUND">Outbound</option>
+      </select>
+
+      <!-- Service category filter -->
+      <select id="serviceCategoryFilter" onchange="onFilterChange()">
+        <option value="">All Services</option>
+        <option value="Web">Web (80,443,8080)</option>
+        <option value="Mail">Mail (25,465,587)</option>
+        <option value="Database">Database (3306,5432)</option>
+        <option value="Remote">Remote (22,3389)</option>
+        <option value="Unknown">Unknown</option>
+      </select>
+
+      <!-- Frequency filter -->
+      <select id="frequencyFilter" onchange="onFilterChange()">
+        <option value="">All Frequencies</option>
+        <option value=">1">>1</option>
+        <option value=">5">>5</option>
+        <option value=">10">>10</option>
+        <option value=">25">>25</option>
+        <option value=">50">>50</option>
+        <option value=">100">>100</option>
+        <option value=">500">>500</option>
+        <option value=">1000">>1000</option>
+      </select>
+
+      <!-- Country filter -->
+      <select id="countryFilter" onchange="onFilterChange()">
+        <option value="">All Countries</option>
+      </select>
+
+      <!-- Port filter -->
+      <select id="portFilter" onchange="onFilterChange()">
+        <option value="">All Ports</option>
+        <option value="custom">Enter Port #...</option>
+      </select>
+      <input id="customPort" type="text" placeholder="Port #" style="display:none;" onblur="onFilterChange()" />
+
+      <!-- Source/Destination IP filters -->
+      <input id="srcIpFilter" type="text" placeholder="Source IP" onblur="onFilterChange()" />
+      <input id="dstIpFilter" type="text" placeholder="Destination IP" onblur="onFilterChange()" />
     `;
     return div;
   };
   control.addTo(map);
-}
-
-function addStatsBar() {
-  const stats = L.control({ position: "bottomleft" });
-  stats.onAdd = function () {
-    const div = L.DomUtil.create("div", "stats-bar");
-    div.id = "statsBar";
-    div.style.background = "rgba(0,0,0,0.7)";
-    div.style.color = "#fff";
-    div.style.padding = "8px";
-    div.style.fontSize = "12px";
-    div.style.maxWidth = "300px";
-    div.innerHTML = "Loading stats...";
-    return div;
-  };
-  stats.addTo(map);
 }
 
 function addZoomButton() {
@@ -107,6 +153,16 @@ function addZoomButton() {
 function onFilterChange() {
   const timeVal = document.getElementById("timeRange").value;
   const verdictVal = document.getElementById("verdictFilter").value;
+  const protoVal = document.getElementById("protoFilter").value;
+  const directionVal = document.getElementById("directionFilter").value;
+  const serviceCategoryVal = document.getElementById("serviceCategoryFilter").value;
+  const frequencyVal = document.getElementById("frequencyFilter").value;
+  const countryVal = document.getElementById("countryFilter").value;
+  const portVal = document.getElementById("portFilter").value;
+  const customPortInput = document.getElementById("customPort");
+  const portFinal = portVal === "custom" ? customPortInput.value : portVal;
+  const srcIpVal = document.getElementById("srcIpFilter").value;
+  const dstIpVal = document.getElementById("dstIpFilter").value;
 
   let since = null;
   if (timeVal) {
@@ -120,15 +176,45 @@ function onFilterChange() {
     since = now.toISOString();
   }
 
-  loadEvents(since, verdictVal);
+  loadEvents(
+    since,
+    verdictVal,
+    protoVal,
+    directionVal,
+    serviceCategoryVal,
+    frequencyVal,
+    countryVal,
+    portFinal,
+    srcIpVal,
+    dstIpVal
+  );
   loadStats();
 }
 
-function loadEvents(since = null, verdict = null) {
+function loadEvents(
+  since = null,
+  verdict = null,
+  proto = null,
+  direction = null,
+  serviceCategory = null,
+  frequency = null,
+  country = null,
+  port = null,
+  srcIp = null,
+  dstIp = null
+) {
   let url = "/api/events";
   const params = [];
   if (since) params.push(`since=${encodeURIComponent(since)}`);
-  if (verdict && verdict !== "") params.push(`verdict=${encodeURIComponent(verdict)}`);
+  if (verdict) params.push(`verdict=${encodeURIComponent(verdict)}`);
+  if (proto) params.push(`proto=${encodeURIComponent(proto)}`);
+  if (direction) params.push(`direction=${encodeURIComponent(direction)}`);
+  if (serviceCategory) params.push(`service_category=${encodeURIComponent(serviceCategory)}`);
+  if (frequency) params.push(`frequency=${encodeURIComponent(frequency)}`);
+  if (country) params.push(`country=${encodeURIComponent(country)}`);
+  if (port) params.push(`port=${encodeURIComponent(port)}`);
+  if (srcIp) params.push(`src_ip=${encodeURIComponent(srcIp)}`);
+  if (dstIp) params.push(`dst_ip=${encodeURIComponent(dstIp)}`);
   if (params.length) url += "?" + params.join("&");
 
   fetch(url)
@@ -174,7 +260,7 @@ function loadEvents(since = null, verdict = null) {
         markers.push(marker);
       });
 
-      // 👇 Auto zoom to fit all markers after load
+      // Auto zoom to fit all markers after load
       if (markers.length > 0) {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds(), { padding: [20, 20] });
@@ -191,6 +277,26 @@ function loadStats() {
     .then((stats) => {
       const div = document.getElementById("statsBar");
 
+      // Populate country filter
+      const countrySelect = document.getElementById("countryFilter");
+      if (countrySelect) {
+        countrySelect.innerHTML = '<option value="">All Countries</option>';
+        stats.top_countries.slice(0, 20).forEach(c => {
+          countrySelect.innerHTML += `<option value="${c.country}">${c.country}</option>`;
+        });
+      }
+
+      // Populate port filter
+      const portSelect = document.getElementById("portFilter");
+      if (portSelect) {
+        portSelect.innerHTML = '<option value="">All Ports</option>';
+        stats.top_ports.slice(0, 20).forEach(p => {
+          portSelect.innerHTML += `<option value="${p.port}">${p.port}</option>`;
+        });
+        portSelect.innerHTML += `<option value="custom">Enter Port #...</option>`;
+      }
+
+      // Stats bar display
       const formatPort = (p) => {
         const svc = services[p.port] || p.service || "";
         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
