@@ -174,6 +174,12 @@ function loadEvents(since = null, verdict = null) {
         marker.addTo(map);
         markers.push(marker);
       });
+
+      // 👇 Auto zoom to fit all markers after load
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [20, 20] });
+      }
     })
     .catch((err) => {
       console.error("Failed to load events:", err);
