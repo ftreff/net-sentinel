@@ -23,7 +23,7 @@ function initMap() {
 
   addTimeFilterControl();
   addStatsBar();
-  addZoomButton();   // new zoom-to-fit control
+  addZoomButton();
   loadEvents();      // default: all time
   loadStats();       // initial stats
 }
@@ -137,15 +137,21 @@ function loadEvents(since = null, verdict = null) {
         });
 
         const popup = `
-          <b>IP:</b> ${event.ip}<br>
-          <b>Reverse DNS:</b> ${event.reverse_dns || "N/A"}<br>
-          <b>Country:</b> ${event.country || "N/A"}<br>
-          <b>City:</b> ${event.city || "N/A"}<br>
-          <b>Port:</b> ${event.port}<br>
-          <b>Service:</b> ${event.service}<br>
+          <b>Source IP:</b> ${event.src_ip}<br>
+          <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
+          <b>Destination IP:</b> ${event.dst_ip}<br>
+          <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
+          <b>Source Port:</b> ${event.src_port || "N/A"} (${event.src_service || "Unknown"})<br>
+          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${event.dst_service || "Unknown"})<br>
+          <b>Direction:</b> ${event.direction}<br>
+          <b>Protocol:</b> ${event.proto || "N/A"}<br>
+          <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
           <b>Verdict:</b> ${event.verdict}<br>
+          <b>Country:</b> ${event.country || "N/A"}<br>
+          <b>Region:</b> ${event.state || "N/A"}<br>
+          <b>City:</b> ${event.city || "N/A"}<br>
           <b>Timestamp:</b> ${event.timestamp}<br>
-          <button onclick="refreshReverseDNS('${event.ip}')">🔄 Refresh DNS</button>
+          <button onclick="refreshDNS('${event.src_ip}', '${event.dst_ip}')">🔄 Refresh DNS</button>
         `;
 
         marker.bindPopup(popup);
@@ -158,21 +164,17 @@ function loadEvents(since = null, verdict = null) {
     });
 }
 
-function refreshReverseDNS(ip) {
-  fetch(`/api/reverse_dns`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ip })
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      alert(`Updated reverse DNS for ${ip}: ${data.reverse_dns || "N/A"}`);
-      onFilterChange(); // reload with current filters
-    })
-    .catch((err) => {
-      console.error("Reverse DNS update failed:", err);
-      alert("Failed to update reverse DNS.");
-    });
+function refreshDNS(srcIp, dstIp) {
+  Promise.all([
+    fetch(`/api/rdns?ip=${encodeURIComponent(srcIp)}`).then(r => r.json()),
+    fetch(`/api/rdns?ip=${encodeURIComponent(dstIp)}`).then(r => r.json())
+  ]).then(([src, dst]) => {
+    alert(`Source: ${src.hostname || "N/A"}\nDestination: ${dst.hostname || "N/A"}`);
+    onFilterChange(); // reload with current filters
+  }).catch(err => {
+    console.error("DNS refresh failed", err);
+    alert("Failed to refresh DNS.");
+  });
 }
 
 function loadStats() {
