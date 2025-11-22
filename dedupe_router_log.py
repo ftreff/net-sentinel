@@ -94,14 +94,19 @@ def dedupe_log():
                 f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp'].isoformat()}\n"
             )
 
-    # atomic rewrite of router.log
+    # ✅ progress bar while rewriting router.log
     tmp_path = LOG_PATH + ".tmp"
     with open(tmp_path, "w") as f:
-        f.writelines(keep_lines)
+        for line in tqdm(keep_lines, desc="Rewriting router.log", unit="line"):
+            f.write(line)
     os.replace(tmp_path, LOG_PATH)
 
+    # ✅ summary report
+    total_kept = len(keep_lines)
+    total_grouped = len(groups)
     print(f"✅ Deduplication complete. Grouped log written to {OUTPUT_PATH}")
     print(f"➡️ Router log truncated to last 7 days.")
+    print(f"📊 Summary: {total_kept} recent lines kept, {total_grouped} grouped events written.")
 
 if __name__ == "__main__":
     dedupe_log()
