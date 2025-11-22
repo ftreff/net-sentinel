@@ -2,6 +2,7 @@ import os
 import re
 import datetime
 from collections import defaultdict
+from tqdm import tqdm   # ✅ progress bar
 
 LOG_PATH = "/var/log/router.log"
 OUTPUT_DIR = "logs"  # project folder
@@ -12,19 +13,23 @@ def parse_line(line):
     dst_match = re.search(r"DST=([\d\.]+)", line)
     spt_match = re.search(r"SPT=(\d+)", line)
     dpt_match = re.search(r"DPT=(\d+)", line)
+    proto_match = re.search(r"PROTO=(\w+)", line)
+    in_if_match = re.search(r"IN=(\w+)", line)
+    out_if_match = re.search(r"OUT=(\w+)", line)
 
     verdict = "DROP" if "DROP" in line else "ACCEPT" if "ACCEPT" in line else None
-    direction = None
-    ip, port = None, None
+    if not verdict or not src_match or not dst_match:
+        return None
 
-    if verdict == "DROP" and "IN=eth0" in line and src_match and dpt_match:
-        direction = "RX"
-        ip = src_match.group(1)
-        port = int(dpt_match.group(1))
-    elif verdict == "ACCEPT" and "OUT=eth0" in line and dst_match and spt_match:
-        direction = "TX"
-        ip = dst_match.group(1)
-        port = int(spt_match.group(1))
+    src_ip = src_match.group(1)
+    dst_ip = dst_match.group(1)
+    src_port = int(spt_match.group(1)) if spt_match else None
+    dst_port = int(dpt_match.group(1)) if dpt_match else None
+    proto = proto_match.group(1) if proto_match else None
+    in_if = in_if_match.group(1) if in_if_match else None
+    out_if = out_if_match.group(1) if out_if_match else None
+
+    direction = "Inbound" if in_if else "Outbound"
 
     # syslog timestamp parsing (no year included)
     ts_match = re.search(r"\w{3}\s+\d+\s[\d:]+", line)
@@ -33,7 +38,6 @@ def parse_line(line):
             ts = datetime.datetime.strptime(ts_match.group(0), "%b %d %H:%M:%S")
             now = datetime.datetime.now()
             year = now.year
-            # adjust for year rollover: if parsed month > current month and we are in January, roll back
             if ts.month > now.month and now.month == 1:
                 year -= 1
             timestamp = ts.replace(year=year)
@@ -42,38 +46,52 @@ def parse_line(line):
     else:
         timestamp = datetime.datetime.now(datetime.timezone.utc)
 
-    if ip and port and verdict and direction:
-        return (ip, port, verdict, direction, timestamp, line.strip())
-    return None
+    return {
+        "src_ip": src_ip,
+        "dst_ip": dst_ip,
+        "src_port": src_port,
+        "dst_port": dst_port,
+        "proto": proto,
+        "in_if": in_if,
+        "out_if": out_if,
+        "verdict": verdict.upper(),
+        "direction": direction,
+        "timestamp": timestamp,
+        "raw_line": line.strip()
+    }
 
 def dedupe_log():
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
     groups = defaultdict(lambda: {"count": 0, "timestamp": None, "line": None})
+    keep_lines = []
 
     with open(LOG_PATH, "r") as f:
-        for line in f:
+        for line in tqdm(f, desc="Deduping router.log", unit="line"):   # ✅ progress bar
             parsed = parse_line(line)
             if not parsed:
                 continue
-            ip, port, verdict, direction, timestamp, raw_line = parsed
 
-            if timestamp >= cutoff:
-                # keep recent lines untouched
+            if parsed["timestamp"] >= cutoff:
                 keep_lines.append(line)
             else:
-                key = (ip, port, verdict, direction)
+                key = (
+                    parsed["src_ip"], parsed["dst_ip"],
+                    parsed["src_port"], parsed["dst_port"],
+                    parsed["proto"], parsed["verdict"], parsed["direction"]
+                )
                 groups[key]["count"] += 1
-                if (groups[key]["timestamp"] is None or timestamp > groups[key]["timestamp"]):
-                    groups[key]["timestamp"] = timestamp
-                groups[key]["line"] = raw_line
+                if (groups[key]["timestamp"] is None or parsed["timestamp"] > groups[key]["timestamp"]):
+                    groups[key]["timestamp"] = parsed["timestamp"]
+                groups[key]["line"] = parsed["raw_line"]
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # write grouped log
     with open(OUTPUT_PATH, "w") as out:
         for key, data in groups.items():
-            ip, port, verdict, direction = key
-            out.write(f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp'].isoformat()}\n")
+            out.write(
+                f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp'].isoformat()}\n"
+            )
 
     # atomic rewrite of router.log
     tmp_path = LOG_PATH + ".tmp"
@@ -85,6 +103,4 @@ def dedupe_log():
     print(f"➡️ Router log truncated to last 7 days.")
 
 if __name__ == "__main__":
-    keep_lines = []
     dedupe_log()
-
