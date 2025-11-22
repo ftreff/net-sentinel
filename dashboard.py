@@ -149,5 +149,9 @@ def get_stats():
 
     return jsonify(stats)
 
+@app.route("/services.json")
+def services_file():
+    return send_from_directory("data", "services.json")
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
