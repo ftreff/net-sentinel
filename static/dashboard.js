@@ -167,7 +167,6 @@ function loadEvents(since = null, verdict = null) {
           <b>Region:</b> ${event.state || "N/A"}<br>
           <b>City:</b> ${event.city || "N/A"}<br>
           <b>Timestamp:</b> ${event.timestamp}<br>
-          <button onclick="refreshDNS('${event.src_ip}', '${event.dst_ip}')">🔄 Refresh DNS</button>
         `;
 
         marker.bindPopup(popup);
@@ -184,19 +183,6 @@ function loadEvents(since = null, verdict = null) {
     .catch((err) => {
       console.error("Failed to load events:", err);
     });
-}
-
-function refreshDNS(srcIp, dstIp) {
-  Promise.all([
-    fetch(`/api/rdns?ip=${encodeURIComponent(srcIp)}`).then(r => r.json()),
-    fetch(`/api/rdns?ip=${encodeURIComponent(dstIp)}`).then(r => r.json())
-  ]).then(([src, dst]) => {
-    alert(`Source: ${src.hostname || "N/A"}\nDestination: ${dst.hostname || "N/A"}`);
-    onFilterChange(); // reload with current filters
-  }).catch(err => {
-    console.error("DNS refresh failed", err);
-    alert("Failed to refresh DNS.");
-  });
 }
 
 function loadStats() {
