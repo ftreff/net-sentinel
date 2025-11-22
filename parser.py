@@ -213,14 +213,27 @@ def enrich_event(event):
     event["src_service"] = guess_service(event["src_port"]) if event["src_port"] else None
     event["dst_service"] = guess_service(event["dst_port"]) if event["dst_port"] else None
 
-    # GeoIP (source IP only)
-    info = geoip_lookup(event["src_ip"])
+    # Normalize verdict
+    verdict = event.get("verdict", "").upper()
+    event["verdict"] = verdict
+
+    # Choose IP for GeoIP enrichment:
+    # - DROP → external source IP
+    # - ACCEPT → external destination IP
+    target_ip = event["src_ip"] if verdict == "DROP" else event["dst_ip"]
+
+    info = geoip_lookup(target_ip)
     event["city"] = info.get("city")
     event["state"] = info.get("state")
     event["country"] = info.get("country")
     event["country_code"] = info.get("country_code")
     event["latitude"] = info.get("latitude")
     event["longitude"] = info.get("longitude")
+
+    # Debug log
+    logging.warning(
+        f"Enriched {verdict} event: target_ip={target_ip}, lat={event['latitude']}, lon={event['longitude']}"
+    )
 
     return event
 
