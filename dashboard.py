@@ -29,21 +29,71 @@ def static_files(path):
 
 @app.route("/api/events")
 def get_events():
+    db = get_db()
     since = request.args.get("since")
     verdict = request.args.get("verdict")
+    proto = request.args.get("proto")
+    src_ip = request.args.get("src_ip")
+    dst_ip = request.args.get("dst_ip")
+    in_if = request.args.get("in_if")
+    out_if = request.args.get("out_if")
+
     query = "SELECT * FROM ip_events WHERE 1=1"
     params = []
 
     if since:
         query += " AND timestamp >= ?"
         params.append(since)
-
-    if verdict and verdict.upper() in ("DROP", "ACCEPT"):
+    if verdict:
         query += " AND verdict = ?"
-        params.append(verdict.upper())
+        params.append(verdict)
+    if proto:
+        query += " AND proto = ?"
+        params.append(proto)
+    if src_ip:
+        query += " AND src_ip = ?"
+        params.append(src_ip)
+    if dst_ip:
+        query += " AND dst_ip = ?"
+        params.append(dst_ip)
+    if in_if:
+        query += " AND in_if = ?"
+        params.append(in_if)
+    if out_if:
+        query += " AND out_if = ?"
+        params.append(out_if)
 
-    rows = get_db().execute(query, params).fetchall()
-    return jsonify([dict(row) for row in rows])
+    rows = db.execute(query, params).fetchall()
+
+    # Convert rows to dicts for JSON
+    events = []
+    for row in rows:
+        events.append({
+            "src_ip": row["src_ip"],
+            "src_rdns": row["src_rdns"],
+            "src_port": row["src_port"],
+            "src_service": row["src_service"],
+            "dst_ip": row["dst_ip"],
+            "dst_rdns": row["dst_rdns"],
+            "dst_port": row["dst_port"],
+            "dst_service": row["dst_service"],
+            "proto": row["proto"],
+            "in_if": row["in_if"],
+            "out_if": row["out_if"],
+            "verdict": row["verdict"],
+            "direction": row["direction"],
+            "timestamp": row["timestamp"],
+            "hit_count": row["hit_count"],
+            "city": row["city"],
+            "state": row["state"],
+            "country": row["country"],
+            "country_code": row["country_code"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+            "trace_path": row["trace_path"]
+        })
+
+    return jsonify(events)
 
 @app.route("/api/reverse_dns", methods=["POST"])
 def refresh_reverse_dns():
