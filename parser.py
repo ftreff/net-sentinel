@@ -6,7 +6,7 @@ import datetime
 import sys
 import logging
 import json
-from tqdm import tqdm
+from tqdm import tqdm   # ✅ progress bar
 
 import geoip2.database
 
@@ -157,8 +157,7 @@ def guess_service(port):
 
     if not name:
         warning_msg = f"Unknown port {port} — consider adding to data/services.json"
-        #tqdm.write(f"⚠️ {warning_msg}")  # CLI warning without breaking progress bar
-        logging.warning(warning_msg)      # log file warning
+        logging.warning(warning_msg)
         name = "Unknown"
 
     return f"{name} ({port})"
@@ -184,26 +183,6 @@ def geoip_lookup(ip):
     geoip_cache[ip] = result
     return result
 
-def enrich_ip(ip, port, direction, timestamp):
-    info = geoip_lookup(ip)
-    return {
-        "ip": ip,
-        "reverse_dns": reverse_dns(ip),
-        "direction": direction,
-        "port": port,
-        "service": guess_service(port),
-        "timestamp": timestamp,
-        "city": info.get("city"),
-        "state": info.get("state"),
-        "country": info.get("country"),
-        "country_code": info.get("country_code"),
-        "latitude": info.get("latitude"),
-        "longitude": info.get("longitude"),
-        "trace_path": None,
-        "verdict": None,
-        "hit_count": 1
-    }
-
 def enrich_event(event):
     # Reverse DNS
     event["src_rdns"] = reverse_dns(event["src_ip"])
@@ -218,8 +197,6 @@ def enrich_event(event):
     event["verdict"] = verdict
 
     # Choose IP for GeoIP enrichment:
-    # - DROP → external source IP
-    # - ACCEPT → external destination IP
     target_ip = event["src_ip"] if verdict == "DROP" else event["dst_ip"]
 
     info = geoip_lookup(target_ip)
@@ -230,7 +207,6 @@ def enrich_event(event):
     event["latitude"] = info.get("latitude")
     event["longitude"] = info.get("longitude")
 
-    # Debug log
     logging.warning(
         f"Enriched {verdict} event: target_ip={target_ip}, lat={event['latitude']}, lon={event['longitude']}"
     )
@@ -288,45 +264,56 @@ def process_file(filepath):
     batch = []
     try:
         with open(filepath, "r") as f:
-            for line in tqdm(f, desc=f"Processing {filepath}", unit="line"):
+            for line in tqdm(f, desc=f"Reading {filepath}", unit="line"):
                 parsed = parse_log_line(line)
                 if not parsed:
                     continue
 
-                # Enrich with reverse DNS, services, GeoIP
                 event = enrich_event(parsed)
-
                 batch.append(event)
+
                 if len(batch) >= BATCH_SIZE:
-                    insert_events(batch)
+                    for _ in tqdm(range(1), desc="Inserting batch", unit="batch"):
+                        insert_events(batch)
                     inserted += len(batch)
                     batch = []
     except FileNotFoundError:
         tqdm.write(f"⚠️ File not found: {filepath}")
-        return
+        return 0
     except Exception as e:
         tqdm.write(f"⚠️ Error processing {filepath}: {e}")
-        # continue after logging; batch may still flush below
 
     if batch:
-        insert_events(batch)
+        for _ in tqdm(range(1), desc="Final insert", unit="batch"):
+            insert_events(batch)
         inserted += len(batch)
 
     tqdm.write(f"✅ Finished {filepath} — {inserted} events processed (deduplicated with hit counter)")
+    return inserted
 
 def process_logs():
-    # process live router.log
+    totals = {}
     router_log = os.path.join(LOG_DIR, "router.log")
     if os.path.exists(router_log):
-        process_file(router_log)
+        tqdm.write("📥 Processing live router.log")
+        totals["router.log"] = process_file(router_log)
     else:
         tqdm.write(f"ℹ️ Skipping missing {router_log}")
 
-    # process grouped-router.log if exists
     if os.path.exists(GROUPED_LOG):
-        process_file(GROUPED_LOG)
+        tqdm.write("📥 Processing grouped-router.log")
+        totals["grouped-router.log"] = process_file(GROUPED_LOG)
     else:
         tqdm.write(f"ℹ️ Skipping missing {GROUPED_LOG}")
+
+    # ✅ summary report
+    if totals:
+        tqdm.write("📊 Summary Report:")
+        grand_total = 0
+        for fname, count in totals.items():
+            tqdm.write(f"   • {fname}: {count} events processed")
+            grand_total += count
+        tqdm.write(f"   ➡️ Grand Total: {grand_total} events processed across all logs")
 
 if __name__ == "__main__":
     process_logs()
