@@ -160,7 +160,8 @@ def guess_service(port):
         logging.warning(warning_msg)
         name = "Unknown"
 
-    return f"{name} ({port})"
+    return name  # ✅ only return the service name, no "(port)"
+    #return f"{name} ({port})"
 
 def geoip_lookup(ip):
     if ip in geoip_cache:
