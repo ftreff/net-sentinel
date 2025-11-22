@@ -155,6 +155,6 @@
   "0-1023": "Well-Known / System Port  ⚠️Intrusion attempts are common⚠️",
   "5228–5230": "Google Services - Android & Google Home - push notifications 🤖",
   "1024-49151": "Registered / User Port  ⚠️Commonly scanned for exposed services⚠️",
-  "49152-65535": "Dynamic / Ephemeral Port - ⚠️Inbound traffic is usually scanning or botnet activity⚠️",
+  "49152-65535": "Dynamic / Ephemeral Port - ⚠️Inbound traffic is usually scanning or botnet activity⚠️"
 }
 
