@@ -300,8 +300,8 @@ function loadEvents(
           fillOpacity: 0.8,
         });
 
-        const srcSvc = services[String(event.src_port)] || event.src_service || "Unknown";
-        const dstSvc = services[String(event.dst_port)] || event.dst_service || "Unknown";
+        const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
+        const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
 
         const popup = `
           <b>Source IP:</b> ${event.src_ip}<br>
@@ -374,8 +374,8 @@ function loadStats() {
       }
 
       const formatPort = (p) => {
-        const svc = services[p.port] || p.service || "";
-        return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
+         const svc = lookupService(Number(p.port)) || p.service || "";
+         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
       };
 
       div.innerHTML = `
@@ -394,6 +394,26 @@ function loadStats() {
     .catch((err) => {
       console.error("Failed to load stats:", err);
     });
+}
+
+function lookupService(port) {
+  if (!port) return "Unknown";
+  const key = String(port);
+
+  // Exact match
+  if (services[key]) return services[key];
+
+  // Range match: look for keys like "8000-8090"
+  for (const rangeKey in services) {
+    if (rangeKey.includes("-")) {
+      const [min, max] = rangeKey.split("-").map(Number);
+      if (port >= min && port <= max) {
+        return services[rangeKey];
+      }
+    }
+  }
+
+  return "Unknown";
 }
 
 window.onload = initMap;
