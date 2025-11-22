@@ -131,7 +131,7 @@ def get_stats():
             WHERE country IS NOT NULL
             GROUP BY country
             ORDER BY count DESC
-            LIMIT 15
+            LIMIT 20
         """)
     ]
 
@@ -143,7 +143,7 @@ def get_stats():
             WHERE dst_port IS NOT NULL
             GROUP BY dst_port
             ORDER BY count DESC
-            LIMIT 15
+            LIMIT 20
         """)
     ]
 
