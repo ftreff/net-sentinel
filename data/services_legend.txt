@@ -1,0 +1,14 @@
+Legend:
+🎯 = top targeted
+💻 = remote access
+🌐 = web services
+📺 = streaming
+📡 = messaging
+📊 = databases
+🎮 = gaming
+🖥️ = infra
+☁ = cloud infra
+🤖 = IoT
+💰 = crypto/mining
+🏴‍☠️ = P2P/torrent
+🖧 = network (DHCP, NetBIOS, DNS, SMB)
