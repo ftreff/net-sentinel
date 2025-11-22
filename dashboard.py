@@ -72,8 +72,11 @@ def get_events():
 
     # Apply new filters
     if direction:
-        query += " AND direction = ?"
-        params.append(direction)
+        # Accept INBOUND/OUTBOUND from frontend, match DB values
+        if direction.upper() == "INBOUND":
+            query += " AND direction IN ('INBOUND','IN','in')"
+        elif direction.upper() == "OUTBOUND":
+            query += " AND direction IN ('OUTBOUND','OUT','out')"
 
     if country:
         query += " AND country = ?"
