@@ -300,8 +300,8 @@ function loadEvents(
           fillOpacity: 0.8,
         });
 
-        const srcSvc = services[event.src_port] || event.src_service || "Unknown";
-        const dstSvc = services[event.dst_port] || event.dst_service || "Unknown";
+        const srcSvc = services[String(event.src_port)] || event.src_service || "Unknown";
+        const dstSvc = services[String(event.dst_port)] || event.dst_service || "Unknown";
 
         const popup = `
           <b>Source IP:</b> ${event.src_ip}<br>
@@ -317,6 +317,7 @@ function loadEvents(
           <b>Country:</b> ${event.country || "N/A"}<br>
           <b>Region:</b> ${event.state || "N/A"}<br>
           <b>City:</b> ${event.city || "N/A"}<br>
+          <b>Hits:</b> ${event.hit_count || 1}<br>
           <b>Timestamp:</b> ${event.timestamp}<br>
         `;
 
