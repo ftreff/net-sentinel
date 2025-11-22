@@ -22,7 +22,7 @@ dns_cache = {}
 
 # configure logging for warnings
 logging.basicConfig(
-    filename="parser-warnings.log",
+    filename=os.path.join("logs", "parser-warnings.log"),
     level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
