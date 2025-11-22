@@ -6,7 +6,7 @@ function initMap() {
   map = L.map("map", {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
-    wheelPxPerZoomLevel: 60 // slower wheel zoom
+    wheelPxPerZoomLevel: 60
   }).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -18,29 +18,22 @@ function initMap() {
   });
 
   const baseMaps = { Dark: dark, Light: light };
-
   dark.addTo(map);
 
-  // Basemap toggle moved to top-left
   L.control.layers(baseMaps, null, { position: "topleft" }).addTo(map);
 
-  // ✅ Do NOT add duplicate zoom controls — Leaflet adds them by default in top-left
-
+  // ✅ These must be called in order:
   addTimeFilterControl();
-  addStatsBar();
-  addZoomButton(); // ✅ magnifying glass auto-zoom button
-
-  // Ensure custom port toggle is wired after controls exist
+  addStatsBar();       // stats window bottom-left
+  addZoomButton();     // magnifying glass top-left
   initCustomPortToggle();
 
-  // Load services.json first, then events/stats
-  // NOTE: use data path per project structure
   fetch("/data/services.json")
     .then(res => res.json())
     .then(data => {
       services = data;
-      loadEvents();      // default: all time
-      loadStats();       // initial stats
+      loadEvents();
+      loadStats();
     })
     .catch(err => {
       console.error("Failed to load services.json:", err);
