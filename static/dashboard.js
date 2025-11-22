@@ -136,7 +136,7 @@ function addStatsBar() {
     div.style.color = "white";
     div.style.padding = "6px";
     div.style.fontSize = "12px";
-    div.style.maxHeight = "200px";
+    div.style.maxHeight = "750px";
     div.style.overflowY = "auto";
     return div;
   };
