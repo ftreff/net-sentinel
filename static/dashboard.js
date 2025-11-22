@@ -30,8 +30,12 @@ function initMap() {
   addStatsBar();
   addZoomButton(); // ✅ magnifying glass auto-zoom button
 
+  // Ensure custom port toggle is wired after controls exist
+  initCustomPortToggle();
+
   // Load services.json first, then events/stats
-  fetch("/services.json")
+  // NOTE: use data path per project structure
+  fetch("/data/services.json")
     .then(res => res.json())
     .then(data => {
       services = data;
@@ -50,6 +54,8 @@ function addTimeFilterControl() {
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "filter-box");
     div.innerHTML = `
+      <button id="resetFiltersBtn" onclick="resetFilters()">Reset Filters</button>
+
       <!-- Time filter -->
       <select id="timeRange" onchange="onFilterChange()">
         <option value="">All Time</option>
@@ -127,20 +133,48 @@ function addTimeFilterControl() {
   control.addTo(map);
 }
 
-function addStatsBar() {
-  const control = L.control({ position: "bottomleft" });
-  control.onAdd = function () {
-    const div = L.DomUtil.create("div", "stats-bar");
-    div.id = "statsBar";
-    div.style.background = "rgba(0,0,0,0.7)";
-    div.style.color = "white";
-    div.style.padding = "6px";
-    div.style.fontSize = "12px";
-    div.style.maxHeight = "750px";
-    div.style.overflowY = "auto";
-    return div;
-  };
-  control.addTo(map);
+function resetFilters() {
+  const idsToReset = [
+    "timeRange",
+    "verdictFilter",
+    "protoFilter",
+    "directionFilter",
+    "serviceCategoryFilter",
+    "frequencyFilter",
+    "countryFilter",
+    "portFilter",
+    "srcIpFilter",
+    "dstIpFilter",
+    "customPort"
+  ];
+
+  idsToReset.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === "SELECT") {
+      el.value = "";
+    } else {
+      el.value = "";
+    }
+  });
+
+  const customPortInput = document.getElementById("customPort");
+  if (customPortInput) customPortInput.style.display = "none";
+
+  onFilterChange();
+}
+
+function initCustomPortToggle() {
+  const portSelect = document.getElementById("portFilter");
+  const customPortInput = document.getElementById("customPort");
+  if (!portSelect || !customPortInput) return;
+
+  portSelect.addEventListener("change", () => {
+    const useCustom = portSelect.value === "custom";
+    customPortInput.style.display = useCustom ? "inline-block" : "none";
+    if (!useCustom) customPortInput.value = "";
+    onFilterChange();
+  });
 }
 
 function addZoomButton() {
@@ -191,13 +225,20 @@ function onFilterChange() {
     since = now.toISOString();
   }
 
+  // Normalize frequency (">10" -> 10)
+  let frequencyThreshold = null;
+  if (frequencyVal && frequencyVal.startsWith(">")) {
+    const n = parseInt(frequencyVal.slice(1), 10);
+    if (!isNaN(n)) frequencyThreshold = n;
+  }
+
   loadEvents(
     since,
     verdictVal,
     protoVal,
     directionVal,
     serviceCategoryVal,
-    frequencyVal,
+    frequencyThreshold,
     countryVal,
     portFinal,
     srcIpVal,
@@ -212,7 +253,7 @@ function loadEvents(
   proto = null,
   direction = null,
   serviceCategory = null,
-  frequency = null,
+  frequencyThreshold = null,
   country = null,
   port = null,
   srcIp = null,
@@ -225,7 +266,7 @@ function loadEvents(
   if (proto) params.push(`proto=${encodeURIComponent(proto)}`);
   if (direction) params.push(`direction=${encodeURIComponent(direction)}`);
   if (serviceCategory) params.push(`service_category=${encodeURIComponent(serviceCategory)}`);
-  if (frequency) params.push(`frequency=${encodeURIComponent(frequency)}`);
+  if (frequencyThreshold != null) params.push(`frequency=${frequencyThreshold}`);
   if (country) params.push(`country=${encodeURIComponent(country)}`);
   if (port) params.push(`port=${encodeURIComponent(port)}`);
   if (srcIp) params.push(`src_ip=${encodeURIComponent(srcIp)}`);
@@ -275,7 +316,6 @@ function loadEvents(
         markers.push(marker);
       });
 
-      // Auto zoom to fit all markers after load
       if (markers.length > 0) {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds(), { padding: [20, 20] });
@@ -292,26 +332,37 @@ function loadStats() {
     .then((stats) => {
       const div = document.getElementById("statsBar");
 
-      // Populate country filter
       const countrySelect = document.getElementById("countryFilter");
+      const portSelect = document.getElementById("portFilter");
+      const prevCountry = countrySelect ? countrySelect.value : "";
+      const prevPort = portSelect ? portSelect.value : "";
+
       if (countrySelect) {
         countrySelect.innerHTML = '<option value="">All Countries</option>';
         stats.top_countries.slice(0, 20).forEach(c => {
-          countrySelect.innerHTML += `<option value="${c.country}">${c.country}</option>`;
+          const opt = document.createElement("option");
+          opt.value = c.country;
+          opt.textContent = c.country;
+          countrySelect.appendChild(opt);
         });
+        countrySelect.value = prevCountry || "";
       }
 
-      // Populate port filter
-      const portSelect = document.getElementById("portFilter");
       if (portSelect) {
         portSelect.innerHTML = '<option value="">All Ports</option>';
         stats.top_ports.slice(0, 20).forEach(p => {
-          portSelect.innerHTML += `<option value="${p.port}">${p.port}</option>`;
+          const opt = document.createElement("option");
+          opt.value = String(p.port);
+          opt.textContent = String(p.port);
+          portSelect.appendChild(opt);
         });
-        portSelect.innerHTML += `<option value="custom">Enter Port #...</option>`;
+        const customOpt = document.createElement("option");
+        customOpt.value = "custom";
+        customOpt.textContent = "Enter Port #...";
+        portSelect.appendChild(customOpt);
+        portSelect.value = prevPort || "";
       }
 
-      // Stats bar display
       const formatPort = (p) => {
         const svc = services[p.port] || p.service || "";
         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
@@ -324,6 +375,11 @@ function loadStats() {
         <b>Top Ports:</b><br>
         ${stats.top_ports.map(formatPort).join("<br>")}
       `;
+
+      const customPortInput = document.getElementById("customPort");
+      if (customPortInput && portSelect) {
+        customPortInput.style.display = portSelect.value === "custom" ? "inline-block" : "none";
+      }
     })
     .catch((err) => {
       console.error("Failed to load stats:", err);
