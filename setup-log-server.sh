@@ -30,7 +30,16 @@ EOF
 
 echo "📁 Creating log file and setting permissions..."
 sudo touch /var/log/router.log
-sudo chown syslog:adm /var/log/router.log
+
+# Detect rsyslog user; default to root if not present
+if id -u syslog >/dev/null 2>&1; then
+    echo "ℹ️ Using syslog user for ownership"
+    sudo chown syslog:adm /var/log/router.log
+else
+    echo "ℹ️ No syslog user found, using root"
+    sudo chown root:adm /var/log/router.log
+fi
+
 sudo chmod 640 /var/log/router.log
 
 echo "🔄 Restarting rsyslog..."
@@ -44,9 +53,6 @@ sudo systemctl is-enabled rsyslog && echo "✅ rsyslog is enabled on boot." || e
 
 echo ""
 echo "📦 Log server is ready and will start automatically on reboot."
-
-echo ""
-echo "✅ Setup complete."
 echo "➡️ Configure your router to send syslog to this server's IP on UDP port 514."
 echo "📄 Logs will appear in: /var/log/router.log"
 echo "🧪 Run tail -f /var/log/router.log to confirm logs are arriving."
