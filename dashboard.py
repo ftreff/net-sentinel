@@ -138,9 +138,10 @@ def get_stats():
     stats["top_ports"] = [
         {"port": row["port"], "count": row["count"]}
         for row in db.execute("""
-            SELECT port, SUM(hit_count) as count
+            SELECT dst_port as port, SUM(hit_count) as count
             FROM ip_events
-            GROUP BY port
+            WHERE dst_port IS NOT NULL
+            GROUP BY dst_port
             ORDER BY count DESC
             LIMIT 15
         """)
