@@ -150,17 +150,30 @@ def reverse_dns(ip):
     return result
 
 def guess_service(port):
-    # Try external map first (keys are strings)
-    name = SERVICES_MAP.get(str(port))
-    if not name:
-        name = DEFAULT_SERVICES.get(port)
+    if port is None:
+        return "Unknown"
 
+    # First check external services.json map
+    for key, name in SERVICES_MAP.items():
+        if "-" in key:
+            try:
+                start, end = map(int, key.split("-"))
+                if start <= port <= end:
+                    return name
+            except ValueError:
+                # malformed range, skip
+                continue
+        elif str(port) == key:
+            return name
+
+    # Then check built‑in defaults
+    name = DEFAULT_SERVICES.get(port)
     if not name:
         warning_msg = f"Unknown port {port} — consider adding to data/services.json"
         logging.warning(warning_msg)
         name = "Unknown"
 
-    return name  # ✅ only return the service name, no "(port)"
+    return name   # ✅ only return service name, no duplicate port number, no "(port)"
     #return f"{name} ({port})"
 
 def geoip_lookup(ip):
