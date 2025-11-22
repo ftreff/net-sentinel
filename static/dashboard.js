@@ -24,12 +24,11 @@ function initMap() {
   // Basemap toggle moved to top-left
   L.control.layers(baseMaps, null, { position: "topleft" }).addTo(map);
 
-  // Add zoom controls explicitly to top-left
-  L.control.zoom({ position: "topleft" }).addTo(map);
+  // ✅ Do NOT add duplicate zoom controls — Leaflet adds them by default in top-left
 
   addTimeFilterControl();
   addStatsBar();
-  addZoomButton();
+  addZoomButton(); // ✅ magnifying glass auto-zoom button
 
   // Load services.json first, then events/stats
   fetch("/services.json")
