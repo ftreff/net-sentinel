@@ -1,5 +1,6 @@
 let map;
 let markers = [];
+let services = {}; // will hold services.json mapping
 
 function initMap() {
   map = L.map("map", {
@@ -24,8 +25,20 @@ function initMap() {
   addTimeFilterControl();
   addStatsBar();
   addZoomButton();
-  loadEvents();      // default: all time
-  loadStats();       // initial stats
+
+  // Load services.json first, then events/stats
+  fetch("/services.json")
+    .then(res => res.json())
+    .then(data => {
+      services = data;
+      loadEvents();      // default: all time
+      loadStats();       // initial stats
+    })
+    .catch(err => {
+      console.error("Failed to load services.json:", err);
+      loadEvents();
+      loadStats();
+    });
 }
 
 function addTimeFilterControl() {
@@ -136,13 +149,16 @@ function loadEvents(since = null, verdict = null) {
           fillOpacity: 0.8,
         });
 
+        const srcSvc = services[event.src_port] || event.src_service || "Unknown";
+        const dstSvc = services[event.dst_port] || event.dst_service || "Unknown";
+
         const popup = `
           <b>Source IP:</b> ${event.src_ip}<br>
           <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
           <b>Destination IP:</b> ${event.dst_ip}<br>
           <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
-          <b>Source Port:</b> ${event.src_port || "N/A"} (${event.src_service || "Unknown"})<br>
-          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${event.dst_service || "Unknown"})<br>
+          <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
+          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
           <b>Direction:</b> ${event.direction}<br>
           <b>Protocol:</b> ${event.proto || "N/A"}<br>
           <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
@@ -183,15 +199,8 @@ function loadStats() {
     .then((stats) => {
       const div = document.getElementById("statsBar");
 
-      const portService = {
-        21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp", 53: "dns", 80: "http",
-        110: "pop3", 123: "ntp", 143: "imap", 161: "snmp", 443: "https", 445: "smb",
-        465: "smtps", 587: "submission", 993: "imaps", 995: "pop3s", 3306: "mysql",
-        3389: "rdp", 5432: "postgres", 8080: "http-alt"
-      };
-
       const formatPort = (p) => {
-        const svc = portService[p.port] || "";
+        const svc = services[p.port] || p.service || "";
         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
       };
 
