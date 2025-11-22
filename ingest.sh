@@ -13,4 +13,4 @@ sudo nice -n -5 ionice -c2 -n0 python3 dedupe_router_log.py
 echo "🧠 Running parser..."
 sudo nice -n -5 ionice -c2 -n0 python3 parser.py
 
-echo "✅ Ingestion complete. Database updated with latest events."
+echo "✅ Ingestion complete. Database updated."
