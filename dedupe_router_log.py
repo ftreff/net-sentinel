@@ -65,8 +65,9 @@ def dedupe_log():
     groups = defaultdict(lambda: {"count": 0, "timestamp": None, "line": None})
     keep_lines = []
 
+    # ✅ progress bar while reading
     with open(LOG_PATH, "r") as f:
-        for line in tqdm(f, desc="Deduping router.log", unit="line"):   # ✅ progress bar
+        for line in tqdm(f, desc="Deduping router.log", unit="line"):
             parsed = parse_line(line)
             if not parsed:
                 continue
@@ -86,9 +87,9 @@ def dedupe_log():
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # write grouped log
+    # ✅ progress bar while writing grouped log
     with open(OUTPUT_PATH, "w") as out:
-        for key, data in groups.items():
+        for key, data in tqdm(groups.items(), desc="Writing grouped log", unit="event"):
             out.write(
                 f"{data['line']} HITCOUNT={data['count']} LASTTS={data['timestamp'].isoformat()}\n"
             )
