@@ -87,39 +87,54 @@ def is_private_or_bogon(ip):
     return False
 
 def parse_log_line(line):
+    # Extract fields
     src_match = re.search(r"SRC=([\d\.]+)", line)
     dst_match = re.search(r"DST=([\d\.]+)", line)
     spt_match = re.search(r"SPT=(\d+)", line)
     dpt_match = re.search(r"DPT=(\d+)", line)
+    proto_match = re.search(r"PROTO=(\w+)", line)
+    in_if_match = re.search(r"IN=(\w+)", line)
+    out_if_match = re.search(r"OUT=(\w+)", line)
 
     verdict = "DROP" if "DROP" in line else "ACCEPT" if "ACCEPT" in line else None
-    direction = None
-    ip, port = None, None
-
-    if verdict == "DROP" and "IN=eth0" in line and src_match and dpt_match:
-        direction = "RX"
-        ip = src_match.group(1)
-        port = int(dpt_match.group(1))
-    elif verdict == "ACCEPT" and "OUT=eth0" in line and dst_match and spt_match:
-        direction = "TX"
-        ip = dst_match.group(1)
-        port = int(spt_match.group(1))
-
-    if not (ip and port and verdict and direction):
+    if not verdict or not src_match or not dst_match:
         return None
 
-    # HITCOUNT marker support
+    src_ip = src_match.group(1)
+    dst_ip = dst_match.group(1)
+    src_port = int(spt_match.group(1)) if spt_match else None
+    dst_port = int(dpt_match.group(1)) if dpt_match else None
+    proto = proto_match.group(1) if proto_match else None
+    in_if = in_if_match.group(1) if in_if_match else None
+    out_if = out_if_match.group(1) if out_if_match else None
+
+    # Direction: inbound if IN=wan/eth0, outbound if OUT=wan/eth0
+    direction = "Inbound" if in_if else "Outbound"
+
+    # HITCOUNT marker
     hit_match = re.search(r"HITCOUNT=(\d+)", line)
     hit_count = int(hit_match.group(1)) if hit_match else 1
 
-    # LASTTS marker support (from grouped log). Accept ISO8601 variants incl. Z and fractional seconds.
+    # Timestamp
     ts_match = re.search(r"LASTTS=([0-9T:\-\.]+Z?)", line)
     if ts_match:
         timestamp = ts_match.group(1)
     else:
         timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-    return (direction, ip, port, verdict, hit_count, timestamp)
+    return {
+        "src_ip": src_ip,
+        "dst_ip": dst_ip,
+        "src_port": src_port,
+        "dst_port": dst_port,
+        "proto": proto,
+        "in_if": in_if,
+        "out_if": out_if,
+        "verdict": verdict,
+        "direction": direction,
+        "hit_count": hit_count,
+        "timestamp": timestamp
+    }
 
 def reverse_dns(ip):
     if ip in dns_cache:
@@ -189,6 +204,26 @@ def enrich_ip(ip, port, direction, timestamp):
         "hit_count": 1
     }
 
+def enrich_event(event):
+    # Reverse DNS
+    event["src_rdns"] = reverse_dns(event["src_ip"])
+    event["dst_rdns"] = reverse_dns(event["dst_ip"])
+
+    # Services
+    event["src_service"] = guess_service(event["src_port"]) if event["src_port"] else None
+    event["dst_service"] = guess_service(event["dst_port"]) if event["dst_port"] else None
+
+    # GeoIP (source IP only)
+    info = geoip_lookup(event["src_ip"])
+    event["city"] = info.get("city")
+    event["state"] = info.get("state")
+    event["country"] = info.get("country")
+    event["country_code"] = info.get("country_code")
+    event["latitude"] = info.get("latitude")
+    event["longitude"] = info.get("longitude")
+
+    return event
+
 def insert_events(events):
     if not events:
         return
@@ -232,10 +267,10 @@ def process_file(filepath):
                 parsed = parse_log_line(line)
                 if not parsed:
                     continue
-                direction, ip, port, verdict, hit_count, timestamp = parsed
-                event = enrich_ip(ip, port, direction, timestamp)
-                event["verdict"] = verdict
-                event["hit_count"] = hit_count
+
+                # Enrich with reverse DNS, services, GeoIP
+                event = enrich_event(parsed)
+
                 batch.append(event)
                 if len(batch) >= BATCH_SIZE:
                     insert_events(batch)
