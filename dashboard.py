@@ -38,6 +38,13 @@ def get_events():
     in_if = request.args.get("in_if")
     out_if = request.args.get("out_if")
 
+    # New filters
+    direction = request.args.get("direction")
+    service_category = request.args.get("service_category")
+    frequency = request.args.get("frequency")
+    country = request.args.get("country")
+    port = request.args.get("port")
+
     query = "SELECT * FROM ip_events WHERE 1=1"
     params = []
 
@@ -62,6 +69,80 @@ def get_events():
     if out_if:
         query += " AND out_if = ?"
         params.append(out_if)
+
+    # Apply new filters
+    if direction:
+        query += " AND direction = ?"
+        params.append(direction)
+
+    if country:
+        query += " AND country = ?"
+        params.append(country)
+
+    if port:
+        try:
+            p = int(port)
+            # Compare as integers for reliability
+            query += " AND (CAST(src_port AS INTEGER) = ? OR CAST(dst_port AS INTEGER) = ?)"
+            params.extend([p, p])
+        except ValueError:
+            # ignore non-numeric port
+            pass
+
+    # Service category mapping: ports and simple ranges
+    # Web: 80, 443, 8080, 8443 and range 8000-8090
+    # Mail: 25, 465, 587, 993, 995
+    # Database: 3306, 5432, 1433, 1521
+    # Remote: 22, 3389, 5900-5901
+    if service_category:
+        cat = service_category.lower()
+        cat_conditions = []
+        # Helper to add IN list checks
+        def add_in_list(ports):
+            if ports:
+                placeholders = ",".join(["?"] * len(ports))
+                cat_conditions.append(f"CAST(src_port AS INTEGER) IN ({placeholders})")
+                cat_conditions.append(f"CAST(dst_port AS INTEGER) IN ({placeholders})")
+                params.extend(ports)
+                params.extend(ports)
+
+        # Helper to add range checks
+        def add_range(min_p, max_p):
+            cat_conditions.append("CAST(src_port AS INTEGER) BETWEEN ? AND ?")
+            cat_conditions.append("CAST(dst_port AS INTEGER) BETWEEN ? AND ?")
+            params.extend([min_p, max_p, min_p, max_p])
+
+        if cat == "web":
+            add_in_list([80, 443, 8080, 8443])
+            add_range(8000, 8090)
+        elif cat == "mail":
+            add_in_list([25, 465, 587, 993, 995])
+        elif cat == "database":
+            add_in_list([3306, 5432, 1433, 1521])
+        elif cat == "remote":
+            add_in_list([22, 3389])
+            add_in_list([5900, 5901])
+        elif cat == "unknown":
+            # Unknown: neither src nor dst match any known category
+            # Implement as NOT matching any of the above sets/ranges
+            known_ports = [80, 443, 8080, 8443, 25, 465, 587, 993, 995, 3306, 5432, 1433, 1521, 22, 3389, 5900, 5901]
+            placeholders = ",".join(["?"] * len(known_ports))
+            query += f" AND (CAST(src_port AS INTEGER) NOT IN ({placeholders}) AND CAST(dst_port AS INTEGER) NOT IN ({placeholders}))"
+            params.extend(known_ports)
+            params.extend(known_ports)
+        # Attach positive category conditions if any were built
+        if cat in ("web", "mail", "database", "remote"):
+            # Combine src/dst conditions with OR
+            query += " AND (" + " OR ".join(cat_conditions) + ")"
+
+    # Frequency threshold: filter rows with hit_count greater than threshold
+    if frequency:
+        try:
+            thresh = int(frequency)
+            query += " AND hit_count > ?"
+            params.append(thresh)
+        except ValueError:
+            pass
 
     rows = db.execute(query, params).fetchall()
 
@@ -151,6 +232,11 @@ def get_stats():
 
 @app.route("/services.json")
 def services_file():
+    return send_from_directory("data", "services.json")
+
+# New route to match frontend path /data/services.json
+@app.route("/data/services.json")
+def services_file_data():
     return send_from_directory("data", "services.json")
 
 if __name__ == "__main__":
