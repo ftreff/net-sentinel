@@ -105,6 +105,7 @@ function addTimeFilterControl() {
         <option value="Mail">Mail (25,465,587)</option>
         <option value="Database">Database (3306,5432)</option>
         <option value="Remote">Remote (22,3389)</option>
+        <option value="BitTorrent">BitTorrent (6881–6999, 51413, 16881, 63783, 6969, 7021)</option>
         <option value="Unknown">Unknown</option>
       </select>
 
@@ -212,8 +213,8 @@ function onFilterChange() {
   const timeVal = document.getElementById("timeRange").value;
   const verdictVal = document.getElementById("verdictFilter").value;
   const protoVal = document.getElementById("protoFilter").value;
-  const directionVal = document.getElementById("directionFilter").value;
-  const serviceCategoryVal = document.getElementById("serviceCategoryFilter").value;
+  let directionVal = document.getElementById("directionFilter").value;
+  let serviceCategoryVal = document.getElementById("serviceCategoryFilter").value;
   const frequencyVal = document.getElementById("frequencyFilter").value;
   const countryVal = document.getElementById("countryFilter").value;
   const portVal = document.getElementById("portFilter").value;
@@ -221,6 +222,14 @@ function onFilterChange() {
   const portFinal = portVal === "custom" ? customPortInput.value : portVal;
   const srcIpVal = document.getElementById("srcIpFilter").value;
   const dstIpVal = document.getElementById("dstIpFilter").value;
+
+  // Normalize values
+  if (serviceCategoryVal) {
+    serviceCategoryVal = serviceCategoryVal.toLowerCase(); // e.g. "BitTorrent" → "bittorrent"
+  }
+  if (directionVal) {
+    directionVal = directionVal.toUpperCase(); // e.g. "Inbound" → "INBOUND"
+  }
 
   let since = null;
   if (timeVal) {
@@ -233,6 +242,23 @@ function onFilterChange() {
     if (timeVal === "90d") now.setTime(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     since = now.toISOString();
   }
+
+  // Build query string
+  let url = "/api/events?";
+  if (since) url += `since=${since}&`;
+  if (verdictVal) url += `verdict=${verdictVal}&`;
+  if (protoVal) url += `proto=${protoVal}&`;
+  if (directionVal) url += `direction=${directionVal}&`;
+  if (serviceCategoryVal) url += `service_category=${serviceCategoryVal}&`;
+  if (frequencyVal) url += `frequency=${frequencyVal}&`;
+  if (countryVal) url += `country=${countryVal}&`;
+  if (portFinal) url += `port=${portFinal}&`;
+  if (srcIpVal) url += `src_ip=${srcIpVal}&`;
+  if (dstIpVal) url += `dst_ip=${dstIpVal}&`;
+
+  loadEvents(url);
+}
+
 
   // Normalize frequency (">10" -> 10)
   let frequencyThreshold = null;
