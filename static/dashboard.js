@@ -282,59 +282,64 @@ function loadEvents(
   if (dstIp) params.push(`dst_ip=${encodeURIComponent(dstIp)}`);
   if (params.length) url += "?" + params.join("&");
 
-  fetch(url)
-    .then((res) => res.json())
-    .then((data) => {
-      markers.forEach((m) => map.removeLayer(m));
-      markers = [];
+fetch(url)
+  .then((res) => res.json())
+  .then((data) => {
+    // Clear previous cluster if exists
+    if (window.markerCluster) {
+      map.removeLayer(window.markerCluster);
+    }
 
-      data.forEach((event) => {
-        if (!event.latitude || !event.longitude) return;
+    // Create a new cluster group
+    window.markerCluster = L.markerClusterGroup();
+    markers = []; // keep array for zoom button
 
-        const marker = L.circleMarker([event.latitude, event.longitude], {
-          radius: 6,
-          fillColor: event.verdict === "DROP" ? "red" : "lime",
-          color: "#000",
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8,
-        });
+    data.forEach((event) => {
+      if (!event.latitude || !event.longitude) return;
 
-        const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
-        const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
-
-        const popup = `
-          <b>Source IP:</b> ${event.src_ip}<br>
-          <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
-          <b>Destination IP:</b> ${event.dst_ip}<br>
-          <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
-          <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
-          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
-          <b>Direction:</b> ${event.direction}<br>
-          <b>Protocol:</b> ${event.proto || "N/A"}<br>
-          <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
-          <b>Verdict:</b> ${event.verdict}<br>
-          <b>Country:</b> ${event.country || "N/A"}<br>
-          <b>Region:</b> ${event.state || "N/A"}<br>
-          <b>City:</b> ${event.city || "N/A"}<br>
-          <b>Hits:</b> ${event.hit_count || 1}<br>
-          <b>Timestamp:</b> ${event.timestamp}<br>
-        `;
-
-        marker.bindPopup(popup);
-        marker.addTo(map);
-        markers.push(marker);
+      const marker = L.circleMarker([event.latitude, event.longitude], {
+        radius: 6,
+        fillColor: event.verdict === "DROP" ? "red" : "lime",
+        color: "#000",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.8,
       });
 
-      if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds(), { padding: [20, 20] });
-      }
-    })
-    .catch((err) => {
-      console.error("Failed to load events:", err);
+      const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
+      const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
+
+      const popup = `
+        <b>Source IP:</b> ${event.src_ip}<br>
+        <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
+        <b>Destination IP:</b> ${event.dst_ip}<br>
+        <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
+        <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
+        <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
+        <b>Direction:</b> ${event.direction}<br>
+        <b>Protocol:</b> ${event.proto || "N/A"}<br>
+        <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
+        <b>Verdict:</b> ${event.verdict}<br>
+        <b>Country:</b> ${event.country || "N/A"}<br>
+        <b>Region:</b> ${event.state || "N/A"}<br>
+        <b>City:</b> ${event.city || "N/A"}<br>
+        <b>Hits:</b> ${event.hit_count || 1}<br>
+        <b>Timestamp:</b> ${event.timestamp}<br>
+      `;
+
+      marker.bindPopup(popup);
+      window.markerCluster.addLayer(marker);
+      markers.push(marker);
     });
-}
+
+    // Add cluster group to map
+    map.addLayer(window.markerCluster);
+
+    if (markers.length > 0) {
+      const group = L.featureGroup(markers);
+      map.fitBounds(group.getBounds(), { padding: [20, 20] });
+    }
+  })
 
 function loadStats() {
   fetch("/api/stats")
