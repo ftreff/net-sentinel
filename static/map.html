@@ -5,7 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Net Sentinel Map</title>
   <meta name="description" content="Net Sentinel interactive map of intrusion attempts and network events." />
+
+  <!-- Leaflet core CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="style.css" />
+
   <style>
     html, body, #map {
       height: 100%;
@@ -26,7 +36,13 @@
 <body>
   <div id="map"></div>
 
+  <!-- Leaflet core JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- MarkerCluster JS -->
+  <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+  <!-- Dashboard logic -->
   <script src="dashboard.js"></script>
 </body>
 </html>
