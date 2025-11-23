@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS ip_events (
 
     -- Verdict and direction
     verdict TEXT CHECK(verdict IN ('DROP', 'ACCEPT')),
-    direction TEXT CHECK(direction IN ('Inbound', 'Outbound')),
+    direction TEXT CHECK(direction IN ('INBOUND','OUTBOUND')),
 
     -- Timestamp and counters
     timestamp TEXT NOT NULL,  -- ISO 8601 UTC string
