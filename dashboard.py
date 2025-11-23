@@ -122,16 +122,29 @@ def get_events():
         elif cat == "remote":
             add_in_list([22, 3389])
             add_in_list([5900, 5901])
+        elif cat == "bittorrent":
+            # BitTorrent / P2P ports
+            add_range(6881, 6999)  # classic BitTorrent range
+            add_in_list([51413, 16881, 63783, 6969, 7021])  # specific ports seen in logs
         elif cat == "unknown":
             # Unknown: neither src nor dst match any known category
             # Implement as NOT matching any of the above sets/ranges
-            known_ports = [80, 443, 8080, 8443, 25, 465, 587, 993, 995, 3306, 5432, 1433, 1521, 22, 3389, 5900, 5901]
+            known_ports = [
+                80, 443, 8080, 8443,
+                25, 465, 587, 993, 995,
+                3306, 5432, 1433, 1521,
+                22, 3389, 5900, 5901,
+                # also include BitTorrent ports so they don’t get misclassified as Unknown
+                51413, 16881, 63783, 6969, 7021
+            ]
+            # also cover the 6881–6999 range
             placeholders = ",".join(["?"] * len(known_ports))
             query += f" AND (CAST(src_port AS INTEGER) NOT IN ({placeholders}) AND CAST(dst_port AS INTEGER) NOT IN ({placeholders}))"
             params.extend(known_ports)
             params.extend(known_ports)
+
         # Attach positive category conditions if any were built
-        if cat in ("web", "mail", "database", "remote"):
+        if cat in ("web", "mail", "database", "remote", "bittorrent"):
             # Combine src/dst conditions with OR
             query += " AND (" + " OR ".join(cat_conditions) + ")"
 
