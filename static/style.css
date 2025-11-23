@@ -50,3 +50,31 @@ body.dark::after {
   pointer-events: none;
   z-index: 9999;
 }
+
+/* === Cluster Styling === */
+.marker-cluster-small {
+  background-color: rgba(0, 255, 204, 0.4);
+  color: #000;
+}
+.marker-cluster-medium {
+  background-color: rgba(0, 255, 204, 0.6);
+  color: #000;
+}
+.marker-cluster-large {
+  background-color: rgba(0, 255, 204, 0.8);
+  color: #000;
+}
+
+.marker-cluster div {
+  background-color: #00ffcc;
+  border: 2px solid #0d0d0d;
+  border-radius: 50%;
+  color: #000;
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+}
+
+.marker-cluster span {
+  line-height: 30px;
+  font-size: 14px;
+}
