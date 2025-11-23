@@ -86,6 +86,12 @@ def is_private_or_bogon(ip):
             return True
     return False
 
+def determine_direction(in_if, out_if):
+    if not out_if or out_if.strip() == "":
+        return "INBOUND"
+    else:
+        return "OUTBOUND"
+
 def parse_log_line(line):
     # Extract fields
     src_match = re.search(r"SRC=([\d\.]+)", line)
@@ -108,16 +114,10 @@ def parse_log_line(line):
     in_if = in_if_match.group(1) if in_if_match else None
     out_if = out_if_match.group(1) if out_if_match else None
 
-def determine_direction(in_if, out_if):
-    if not out_if or out_if.strip() == "":
-        return "INBOUND"
-    else:
-        return "OUTBOUND"
-
-# If OUT is empty or missing → INBOUND.
-# If IN is LAN (e.g. br0, wlan0) and OUT is WAN (e.g. eth0) → OUTBOUND.
-#If both IN and OUT are present but OUT is not empty → treat as OUTBOUND.
-direction = determine_direction(in_if, out_if)
+    # If OUT is empty or missing → INBOUND.
+    # If IN is LAN (e.g. br0, wlan0) and OUT is WAN (e.g. eth0) → OUTBOUND.
+    #If both IN and OUT are present but OUT is not empty → treat as OUTBOUND.
+    direction = determine_direction(in_if, out_if)
 
     # HITCOUNT marker
     hit_match = re.search(r"HITCOUNT=(\d+)", line)
