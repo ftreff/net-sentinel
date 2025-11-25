@@ -6,7 +6,8 @@ function initMap() {
   map = L.map("map", {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
-    wheelPxPerZoomLevel: 60
+    wheelPxPerZoomLevel: 60,
+    zoomControl: false // disable default zoom control
   }).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -20,12 +21,16 @@ function initMap() {
   const baseMaps = { Dark: dark, Light: light };
   dark.addTo(map);
 
-  L.control.layers(baseMaps, null, { position: "topleft" }).addTo(map);
+  // ✅ Move basemap toggle to bottom-right
+  L.control.layers(baseMaps, null, { position: "bottomright" }).addTo(map);
+
+  // ✅ Add zoom control bottom-right
+  L.control.zoom({ position: "bottomright" }).addTo(map);
 
   // ✅ These must be called in order:
   addTimeFilterControl();
   addStatsBar();       // stats window bottom-left
-  addZoomButton();     // magnifying glass top-left
+  addZoomButton();     // magnifying glass bottom-right
   initCustomPortToggle();
 
   fetch("/data/services.json")
@@ -130,7 +135,8 @@ function addTimeFilterControl() {
         <option value="">All Ports</option>
         <option value="custom">Enter Port #...</option>
       </select>
-      <input id="customPort" type="text" placeholder="Port #" style="display:none;" onblur="onFilterChange()" />
+      <input id="customPort" type="text" placeholder="Port #"
+             style="display:none;" onblur="onFilterChange()" />
 
       <!-- Source/Destination IP filters -->
       <input id="srcIpFilter" type="text" placeholder="Source IP" onblur="onFilterChange()" />
@@ -186,7 +192,8 @@ function initCustomPortToggle() {
 }
 
 function addZoomButton() {
-  const control = L.control({ position: "topleft" });
+  // ✅ Moved to bottom-right
+  const control = L.control({ position: "bottomright" });
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
     const btn = L.DomUtil.create("a", "", div);
@@ -248,7 +255,7 @@ function onFilterChange() {
     if (!isNaN(n)) frequencyThreshold = n;
   }
 
-  // Fetch with parameters (do not build URL string here)
+  // Call loaders with normalized values
   loadEvents(
     since,
     verdictVal,
