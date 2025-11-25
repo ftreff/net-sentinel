@@ -32,13 +32,11 @@ function initMap() {
     .then(res => res.json())
     .then(data => {
       services = data;
-      loadEvents();
-      loadStats();
+      onFilterChange(); // initial load using current filters
     })
     .catch(err => {
       console.error("Failed to load services.json:", err);
-      loadEvents();
-      loadStats();
+      onFilterChange(); // still load with Unknown services
     });
 }
 
@@ -243,23 +241,6 @@ function onFilterChange() {
     since = now.toISOString();
   }
 
-  // Build query string
-  let url = "/api/events?";
-  if (since) url += `since=${since}&`;
-  if (verdictVal) url += `verdict=${verdictVal}&`;
-  if (protoVal) url += `proto=${protoVal}&`;
-  if (directionVal) url += `direction=${directionVal}&`;
-  if (serviceCategoryVal) url += `service_category=${serviceCategoryVal}&`;
-  if (frequencyVal) url += `frequency=${frequencyVal}&`;
-  if (countryVal) url += `country=${countryVal}&`;
-  if (portFinal) url += `port=${portFinal}&`;
-  if (srcIpVal) url += `src_ip=${srcIpVal}&`;
-  if (dstIpVal) url += `dst_ip=${dstIpVal}&`;
-
-  loadEvents(url);
-}
-
-
   // Normalize frequency (">10" -> 10)
   let frequencyThreshold = null;
   if (frequencyVal && frequencyVal.startsWith(">")) {
@@ -267,6 +248,7 @@ function onFilterChange() {
     if (!isNaN(n)) frequencyThreshold = n;
   }
 
+  // Fetch with parameters (do not build URL string here)
   loadEvents(
     since,
     verdictVal,
@@ -308,64 +290,68 @@ function loadEvents(
   if (dstIp) params.push(`dst_ip=${encodeURIComponent(dstIp)}`);
   if (params.length) url += "?" + params.join("&");
 
-fetch(url)
-  .then((res) => res.json())
-  .then((data) => {
-    // Clear previous cluster if exists
-    if (window.markerCluster) {
-      map.removeLayer(window.markerCluster);
-    }
+  fetch(url)
+    .then((res) => res.json())
+    .then((data) => {
+      // Clear previous cluster if exists
+      if (window.markerCluster) {
+        map.removeLayer(window.markerCluster);
+      }
 
-    // Create a new cluster group
-    window.markerCluster = L.markerClusterGroup();
-    markers = []; // keep array for zoom button
+      // Create a new cluster group
+      window.markerCluster = L.markerClusterGroup();
+      markers = []; // keep array for zoom button
 
-    data.forEach((event) => {
-      if (!event.latitude || !event.longitude) return;
+      data.forEach((event) => {
+        if (!event.latitude || !event.longitude) return;
 
-      const marker = L.circleMarker([event.latitude, event.longitude], {
-        radius: 6,
-        fillColor: event.verdict === "DROP" ? "red" : "lime",
-        color: "#000",
-        weight: 1,
-        opacity: 1,
-        fillOpacity: 0.8,
+        const marker = L.circleMarker([event.latitude, event.longitude], {
+          radius: 6,
+          fillColor: event.verdict === "DROP" ? "red" : "lime",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
+
+        const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
+        const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
+
+        const popup = `
+          <b>Source IP:</b> ${event.src_ip}<br>
+          <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
+          <b>Destination IP:</b> ${event.dst_ip}<br>
+          <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
+          <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
+          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
+          <b>Direction:</b> ${event.direction}<br>
+          <b>Protocol:</b> ${event.proto || "N/A"}<br>
+          <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
+          <b>Verdict:</b> ${event.verdict}<br>
+          <b>Country:</b> ${event.country || "N/A"}<br>
+          <b>Region:</b> ${event.state || "N/A"}<br>
+          <b>City:</b> ${event.city || "N/A"}<br>
+          <b>Hits:</b> ${event.hit_count || 1}<br>
+          <b>Timestamp:</b> ${event.timestamp}<br>
+        `;
+
+        marker.bindPopup(popup);
+        window.markerCluster.addLayer(marker);
+        markers.push(marker);
       });
 
-      const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
-      const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
+      // Add cluster group to map
+      map.addLayer(window.markerCluster);
 
-      const popup = `
-        <b>Source IP:</b> ${event.src_ip}<br>
-        <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
-        <b>Destination IP:</b> ${event.dst_ip}<br>
-        <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
-        <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
-        <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
-        <b>Direction:</b> ${event.direction}<br>
-        <b>Protocol:</b> ${event.proto || "N/A"}<br>
-        <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
-        <b>Verdict:</b> ${event.verdict}<br>
-        <b>Country:</b> ${event.country || "N/A"}<br>
-        <b>Region:</b> ${event.state || "N/A"}<br>
-        <b>City:</b> ${event.city || "N/A"}<br>
-        <b>Hits:</b> ${event.hit_count || 1}<br>
-        <b>Timestamp:</b> ${event.timestamp}<br>
-      `;
-
-      marker.bindPopup(popup);
-      window.markerCluster.addLayer(marker);
-      markers.push(marker);
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [20, 20] });
+      }
+    })
+    .catch((err) => {
+      console.error("Failed to load events:", err);
     });
-
-    // Add cluster group to map
-    map.addLayer(window.markerCluster);
-
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds(), { padding: [20, 20] });
-    }
-  })
+}
 
 function loadStats() {
   fetch("/api/stats")
@@ -405,8 +391,8 @@ function loadStats() {
       }
 
       const formatPort = (p) => {
-         const svc = lookupService(Number(p.port)) || p.service || "";
-         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
+        const svc = lookupService(Number(p.port)) || p.service || "";
+        return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
       };
 
       div.innerHTML = `
