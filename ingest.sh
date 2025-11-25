@@ -7,7 +7,7 @@
 #   ./ingest.sh background   # run live_parser in background (default)
 
 PROJECT_ROOT="$(dirname "$(realpath "$0")")"
-SCRIPS_DIR="$PROJECT_ROOT/scrips"
+SCRIPS_DIR="$PROJECT_ROOT/scripts"
 MODE="${1:-background}"
 
 echo "[ingest] Trimming router.log..."
