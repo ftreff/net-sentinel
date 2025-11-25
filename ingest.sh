@@ -1,20 +1,27 @@
 #!/bin/bash
 # Orchestrator for Net Sentinel ingestion
 # Location: [project-folder]/ingest.sh
-set -euo pipefail
+# Runs scripts from ./scrips/
+# Usage:
+#   ./ingest.sh foreground   # run live_parser in foreground
+#   ./ingest.sh background   # run live_parser in background (default)
+
 PROJECT_ROOT="$(dirname "$(realpath "$0")")"
 SCRIPS_DIR="$PROJECT_ROOT/scrips"
-echo "🚀 Starting Net Sentinel ingestion..."
+
+MODE="${1:-background}"  # default to background if not specified
 
 echo "[ingest] Trimming router.log..."
-sudo nice -n -5 ionice -c2 -n0 python3 "$SCRIPS_DIR/trim_router_log.py"
+python3 "$SCRIPS_DIR/trim_router_log.py"
 
-echo "📦 Loading router log data..."
 echo "[ingest] Batch parsing router.log..."
-sudo nice -n -5 ionice -c2 -n0 python3 "$SCRIPS_DIR/batch_parser.py"
+python3 "$SCRIPS_DIR/batch_parser.py"
 
-echo "🧠 Loading live data from router.log"
-echo "[ingest] Starting live parser (background)..."
-sudo nice -n -5 ionice -c2 -n0 nohup python3 "$SCRIPS_DIR/live_parser.py" > "$PROJECT_ROOT/live_parser.log" 2>&1 &
-echo "[ingest] Live parser running (PID $!)"
-echo "✅ Ingestion complete. Live data from router.log is still being proecessed to database"
+if [ "$MODE" = "foreground" ]; then
+    echo "[ingest] Starting live parser in FOREGROUND..."
+    exec python3 "$SCRIPS_DIR/live_parser.py"
+else
+    echo "[ingest] Starting live parser in BACKGROUND..."
+    nohup python3 "$SCRIPS_DIR/live_parser.py" > "$PROJECT_ROOT/live_parser.log" 2>&1 &
+    echo "[ingest] Live parser running in background (PID $!)"
+fi
