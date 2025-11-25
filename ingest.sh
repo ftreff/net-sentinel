@@ -1,5 +1,5 @@
 #!/bin/bash
-# Orchestrator for Net Sentinel ingestion
+# Net Sentinel ingestion orchestrator
 # Location: [project-folder]/ingest.sh
 # Runs scripts from ./scrips/
 # Usage:
@@ -8,8 +8,7 @@
 
 PROJECT_ROOT="$(dirname "$(realpath "$0")")"
 SCRIPS_DIR="$PROJECT_ROOT/scrips"
-
-MODE="${1:-background}"  # default to background if not specified
+MODE="${1:-background}"
 
 echo "[ingest] Trimming router.log..."
 python3 "$SCRIPS_DIR/trim_router_log.py"
