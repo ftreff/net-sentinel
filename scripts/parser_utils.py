@@ -13,9 +13,13 @@ DB_PATH = os.path.join(PROJECT_ROOT, "net_sentinel.db")
 SCHEMA_FILE = os.path.join(PROJECT_ROOT, "schema.sql")
 GEOIP_PATH = os.path.join(PROJECT_ROOT, "data/geoip/GeoLite2-City.mmdb")
 
+# Ensure logs directory exists
+LOG_DIR = os.path.join(PROJECT_ROOT, "logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+
 # Configure logging
 logging.basicConfig(
-    filename=os.path.join(PROJECT_ROOT, "logs", "parser-warnings.log"),
+    filename=os.path.join(LOG_DIR, "parser-warnings.log"),
     level=logging.WARNING,
     format="%(asctime)s [%(levelname)s] %(message)s"
 )
