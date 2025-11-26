@@ -2,6 +2,7 @@ let map;
 let markers = [];
 let services = {}; // will hold services.json mapping
 let currentClusterRadius = 40; // ✅ global radius state
+let useClusters = true;          // ✅ new flag: start in clustered mode
 
 function initMap() {
   map = L.map("map", {
@@ -75,12 +76,17 @@ function addTimeFilterControl() {
       <!-- Time filter -->
       <select id="timeRange" onchange="onFilterChange()">
         <option value="">All Time</option>
+        <option value="1min">Last 1 min</option>
+        <option value="5min">Last 5 min</option>
         <option value="10min">Last 10 min</option>
+        <option value="30min">Last 30 min</option>
         <option value="1h">Last 1 hour</option>
+        <option value="6h">Last 6 hours</option>
+        <option value="12h">Last 12 hours</option>
         <option value="24h">Last 24 hours</option>
         <option value="7d">Last 7 days</option>
+        <option value="15d">Last 15 days</option>
         <option value="30d">Last 30 days</option>
-        <option value="90d">Last 90 days</option>
       </select>
 
       <!-- Verdict filter -->
@@ -156,11 +162,14 @@ function addClusterRadiusControl() {
   const control = L.control({ position: "topright" });
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "leaflet-bar leaflet-control leaflet-control-custom");
-    div.style.background = "white";
+    div.style.background = "black";   // ✅ black background
+    div.style.color = "white";        // ✅ white text for contrast
     div.style.padding = "5px";
 
     const label = L.DomUtil.create("div", "", div);
-    label.innerHTML = "Cluster Radius: " + currentClusterRadius;
+    label.innerHTML = useClusters ? 
+      "Mode: Grouped (Radius " + currentClusterRadius + ")" : 
+      "Mode: Individual";
 
     const input = L.DomUtil.create("input", "", div);
     input.type = "range";
@@ -171,31 +180,34 @@ function addClusterRadiusControl() {
 
     input.oninput = function () {
       const newRadius = parseInt(this.value);
-      currentClusterRadius = newRadius; // ✅ save globally
-      if (window.markerCluster) {
+      currentClusterRadius = newRadius;
+      if (window.markerCluster && useClusters) {
         window.markerCluster.options.maxClusterRadius = newRadius;
         window.markerCluster.refreshClusters();
       }
-      label.innerHTML = "Cluster Radius: " + newRadius;
+      label.innerHTML = useClusters ? 
+        "Mode: Grouped (Radius " + newRadius + ")" : 
+        "Mode: Individual";
     };
 
     const button = L.DomUtil.create("button", "", div);
-    button.innerHTML = "Toggle Exact/Clustered";
+    button.innerHTML = "Toggle Grouped / Individual";
     button.style.marginTop = "5px";
     button.onclick = function () {
-      if (!window.markerCluster) return;
-      if (window.markerCluster.options.maxClusterRadius === 0) {
-        currentClusterRadius = 40;
-        window.markerCluster.options.maxClusterRadius = 40;
-        input.value = 40;
-        label.innerHTML = "Cluster Radius: 40";
-      } else {
-        currentClusterRadius = 0;
-        window.markerCluster.options.maxClusterRadius = 0;
-        input.value = 0;
-        label.innerHTML = "Cluster Radius: 0 (Exact)";
+      useClusters = !useClusters;
+
+      // Remove existing layers
+      if (window.markerCluster) {
+        map.removeLayer(window.markerCluster);
       }
-      window.markerCluster.refreshClusters();
+      markers.forEach(m => map.removeLayer(m));
+
+      // Reload events with new mode
+      onFilterChange();
+
+      label.innerHTML = useClusters ? 
+        "Mode: Grouped (Radius " + currentClusterRadius + ")" : 
+        "Mode: Individual";
     };
 
     return div;
@@ -295,12 +307,17 @@ function onFilterChange() {
   let since = null;
   if (timeVal) {
     const now = new Date();
+    if (timeVal === "1min") now.setTime(now.getTime() - 1 * 60 * 1000);
+    if (timeVal === "5min") now.setTime(now.getTime() - 5 * 60 * 1000);
     if (timeVal === "10min") now.setTime(now.getTime() - 10 * 60 * 1000);
-    if (timeVal === "1h") now.setTime(now.getTime() - 60 * 60 * 1000);
+    if (timeVal === "30min") now.setTime(now.getTime() - 30 * 60 * 1000);
+    if (timeVal === "1h") now.setTime(now.getTime() - 1 * 60 * 60 * 1000);
+    if (timeVal === "6h") now.setTime(now.getTime() - 6 * 60 * 60 * 1000);
+    if (timeVal === "12h") now.setTime(now.getTime() - 12 * 60 * 60 * 1000);
     if (timeVal === "24h") now.setTime(now.getTime() - 24 * 60 * 60 * 1000);
     if (timeVal === "7d") now.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (timeVal === "15d") now.setTime(now.getTime() - 15 * 24 * 60 * 60 * 1000);
     if (timeVal === "30d") now.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    if (timeVal === "90d") now.setTime(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     since = now.toISOString();
   }
 
@@ -356,16 +373,20 @@ function loadEvents(
   fetch(url)
     .then((res) => res.json())
     .then((data) => {
-      // Clear previous cluster if exists
+      // Clear previous layers
       if (window.markerCluster) {
         map.removeLayer(window.markerCluster);
       }
+      markers.forEach(m => map.removeLayer(m));
+      markers = [];
 
-      // ✅ Create a new cluster group using currentClusterRadius
-      window.markerCluster = L.markerClusterGroup({
-        maxClusterRadius: currentClusterRadius
-      });
-      markers = []; // keep array for zoom button
+      // Create cluster group only if useClusters is true
+      if (useClusters) {
+        window.markerCluster = L.markerClusterGroup({
+          maxClusterRadius: currentClusterRadius
+        });
+      }
+
       data.forEach((event) => {
         if (!event.latitude || !event.longitude) return;
 
@@ -400,13 +421,21 @@ function loadEvents(
         `;
 
         marker.bindPopup(popup);
-        window.markerCluster.addLayer(marker);
         markers.push(marker);
+
+        if (useClusters) {
+          window.markerCluster.addLayer(marker);
+        } else {
+          map.addLayer(marker);
+        }
       });
 
-      // Add cluster group to map
-      map.addLayer(window.markerCluster);
+      // Add cluster group if in clustered mode
+      if (useClusters && window.markerCluster) {
+        map.addLayer(window.markerCluster);
+      }
 
+      // Fit bounds to markers
       if (markers.length > 0) {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds(), { padding: [20, 20] });
