@@ -1,6 +1,7 @@
 let map;
 let markers = [];
 let services = {}; // will hold services.json mapping
+let currentClusterRadius = 40; // ✅ global radius state
 
 function initMap() {
   map = L.map("map", {
@@ -159,17 +160,18 @@ function addClusterRadiusControl() {
     div.style.padding = "5px";
 
     const label = L.DomUtil.create("div", "", div);
-    label.innerHTML = "Cluster Radius: 40";
+    label.innerHTML = "Cluster Radius: " + currentClusterRadius;
 
     const input = L.DomUtil.create("input", "", div);
     input.type = "range";
     input.min = 0;
     input.max = 100;
-    input.value = 40;
+    input.value = currentClusterRadius;
     input.style.width = "100px";
 
     input.oninput = function () {
       const newRadius = parseInt(this.value);
+      currentClusterRadius = newRadius; // ✅ save globally
       if (window.markerCluster) {
         window.markerCluster.options.maxClusterRadius = newRadius;
         window.markerCluster.refreshClusters();
@@ -183,10 +185,12 @@ function addClusterRadiusControl() {
     button.onclick = function () {
       if (!window.markerCluster) return;
       if (window.markerCluster.options.maxClusterRadius === 0) {
+        currentClusterRadius = 40;
         window.markerCluster.options.maxClusterRadius = 40;
         input.value = 40;
         label.innerHTML = "Cluster Radius: 40";
       } else {
+        currentClusterRadius = 0;
         window.markerCluster.options.maxClusterRadius = 0;
         input.value = 0;
         label.innerHTML = "Cluster Radius: 0 (Exact)";
@@ -357,9 +361,9 @@ function loadEvents(
         map.removeLayer(window.markerCluster);
       }
 
-      // Create a new cluster group with adjustable radius
+      // ✅ Create a new cluster group using currentClusterRadius
       window.markerCluster = L.markerClusterGroup({
-        maxClusterRadius: 40 // default, controlled by slider/toggle
+        maxClusterRadius: currentClusterRadius
       });
       markers = []; // keep array for zoom button
       data.forEach((event) => {
@@ -449,7 +453,6 @@ function loadStats() {
         portSelect.appendChild(customOpt);
         portSelect.value = prevPort || "";
       }
-
       const formatPort = (p) => {
         const svc = lookupService(Number(p.port)) || p.service || "";
         return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
@@ -494,3 +497,5 @@ function lookupService(port) {
 }
 
 window.onload = initMap;
+
+      
