@@ -10,17 +10,23 @@ PROJECT_ROOT="$(dirname "$(realpath "$0")")"
 SCRIPTS_DIR="$PROJECT_ROOT/scripts"
 MODE="${1:-background}"
 
-echo "[ingest] Trimming router.log..."
-python3 "$SCRIPTS_DIR/trim_router_log.py"
+echo "🚀 Starting Net Sentinel ingestion pipeline..."
+sleep 1
 
-echo "[ingest] Batch parsing router.log..."
-python3 "$SCRIPTS_DIR/batch_parser.py"
+echo "[1/3] Trimming router.log..."
+sudo python3 "$SCRIPTS_DIR/trim_router_log.py" && echo "✅ Trim complete" || echo "⚠️ Trim failed"
 
+echo "[2/3] Batch parsing router.log..."
+sudo python3 "$SCRIPTS_DIR/batch_parser.py" && echo "✅ Batch parse complete" || echo "⚠️ Batch parse failed"
+
+echo "[3/3] Launching live parser..."
 if [ "$MODE" = "foreground" ]; then
-    echo "[ingest] Starting live parser in FOREGROUND..."
-    exec python3 "$SCRIPTS_DIR/live_parser.py"
+    echo "📡 Live parser running in FOREGROUND (Ctrl+C to stop)..."
+    sudo python3 "$SCRIPTS_DIR/live_parser.py"
 else
-    echo "[ingest] Starting live parser in BACKGROUND..."
-    nohup python3 "$SCRIPTS_DIR/live_parser.py" > "$PROJECT_ROOT/live_parser.log" 2>&1 &
-    echo "[ingest] Live parser running in background (PID $!)"
+    echo "📡 Live parser running in BACKGROUND..."
+    nohup sudo python3 "$SCRIPTS_DIR/live_parser.py" > "$PROJECT_ROOT/live_parser.log" 2>&1 &
+    echo "✅ Live parser started (PID $!) — logs at $PROJECT_ROOT/live_parser.log"
 fi
+
+echo "🎯 Ingestion pipeline initialized."
