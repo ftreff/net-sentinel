@@ -33,6 +33,9 @@ function initMap() {
   addZoomButton();     // magnifying glass bottom-right
   initCustomPortToggle();
 
+  // ✅ Add cluster radius slider + toggle
+  addClusterRadiusControl();
+
   fetch("/data/services.json")
     .then(res => res.json())
     .then(data => {
@@ -100,6 +103,11 @@ function addTimeFilterControl() {
         <option value="INBOUND">Inbound</option>
         <option value="OUTBOUND">Outbound</option>
       </select>
+    `;
+    return div;
+  };
+  control.addTo(map);
+}
 
       <!-- Service category filter -->
       <select id="serviceCategoryFilter" onchange="onFilterChange()">
@@ -142,6 +150,55 @@ function addTimeFilterControl() {
       <input id="srcIpFilter" type="text" placeholder="Source IP" onblur="onFilterChange()" />
       <input id="dstIpFilter" type="text" placeholder="Destination IP" onblur="onFilterChange()" />
     `;
+    return div;
+  };
+  control.addTo(map);
+}
+
+// ✅ New cluster radius slider + toggle control
+function addClusterRadiusControl() {
+  const control = L.control({ position: "topright" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control leaflet-control-custom");
+    div.style.background = "white";
+    div.style.padding = "5px";
+
+    const label = L.DomUtil.create("div", "", div);
+    label.innerHTML = "Cluster Radius: 40";
+
+    const input = L.DomUtil.create("input", "", div);
+    input.type = "range";
+    input.min = 0;
+    input.max = 100;
+    input.value = 40;
+    input.style.width = "100px";
+
+    input.oninput = function () {
+      const newRadius = parseInt(this.value);
+      if (window.markerCluster) {
+        window.markerCluster.options.maxClusterRadius = newRadius;
+        window.markerCluster.refreshClusters();
+      }
+      label.innerHTML = "Cluster Radius: " + newRadius;
+    };
+
+    const button = L.DomUtil.create("button", "", div);
+    button.innerHTML = "Toggle Exact/Clustered";
+    button.style.marginTop = "5px";
+    button.onclick = function () {
+      if (!window.markerCluster) return;
+      if (window.markerCluster.options.maxClusterRadius === 0) {
+        window.markerCluster.options.maxClusterRadius = 40;
+        input.value = 40;
+        label.innerHTML = "Cluster Radius: 40";
+      } else {
+        window.markerCluster.options.maxClusterRadius = 0;
+        input.value = 0;
+        label.innerHTML = "Cluster Radius: 0 (Exact)";
+      }
+      window.markerCluster.refreshClusters();
+    };
+
     return div;
   };
   control.addTo(map);
@@ -305,10 +362,11 @@ function loadEvents(
         map.removeLayer(window.markerCluster);
       }
 
-      // Create a new cluster group
-      window.markerCluster = L.markerClusterGroup();
+      // Create a new cluster group with adjustable radius
+      window.markerCluster = L.markerClusterGroup({
+        maxClusterRadius: 40 // default, controlled by slider/toggle
+      });
       markers = []; // keep array for zoom button
-
       data.forEach((event) => {
         if (!event.latitude || !event.longitude) return;
 
