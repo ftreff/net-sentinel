@@ -16,32 +16,28 @@
 
 - 📊 Stats Bar — See top countries, ports, and verdict counts (aggregated by hit count)
 
-- 🧠 Smart Parsing — Ingests structured logs, deduplicates older entries, and enriches them with GeoIP + reverse DNS
-
-- 📦 Deduplication — Groups events older than 7 days into a summarized log with HITCOUNT and LASTTS markers
+- 🧠 Smart Parsing — Ingests structured logs, removes older entries, and enriches them with GeoIP + reverse DNS
 
 - 🧩 Modular Service Mapping — External data/services.json defines port→service mappings; unknown ports trigger CLI + log warnings
-
-- ⚡ Efficient Storage — SQLite schema enforces uniqueness on (ip, port, verdict, direction) and increments hit counters
 
 - 🔒 Resilient Design — Handles missing GeoIP DB gracefully, skips reverse DNS for private/bogon ranges, and logs warnings cleanly
 
 ## 🚀 Getting Started
 
 ### 1. ⚙️ Setup
-Run the one-time setup script to install dependencies, download the GeoIP database, and initialize the SQLite schema:
+Run the one-time setup scripts to set up log server and install dependencies, download the GeoIP database, and initialize the SQLite schema:
 
 ```bash
+bash setup-log-server.sh
 bash setup.sh
 ```
 
 ### 2. 📡 Ingesting Logs
-Use ingest.sh to deduplicate and parse logs, populate the database, geolocate IPs, and resolve services by port:
-
+Use ingest.sh to parse logs, populate the database, geolocate IPs, and resolve services by port:
+This runs the parser scripts in scripts/ (batch_parser.py, live_parser.py, parser_utils.py)
 ```bash
 bash ingest.sh
 ```
-This runs dedupe_router_log.py first (to archive >7d logs into logs/grouped-router.log), then parser.py to ingest both fresh and grouped logs.
 
 ### 3. 🛠 Start the backend
 ```bash
@@ -52,22 +48,31 @@ Then open http://localhost:5000 in your browser.
 ## 📁 Project Structure
 ```
 net-sentinel/
-├── setup-log-server.sh   # Configures rsyslog to receive logs from a router
-├── setup.sh              # One-time setup script (deps, GeoIP, schema)
-├── ingest.sh             # Runs dedupe + parser
-├── dedupe_router_log.py  # Deduplicates >7d logs into grouped-router.log
-├── parser.py             # Log parser and enrichment engine (GeoIP, reverse DNS, services)
-├── dashboard.py          # Flask backend API
-├── static/               # Frontend files
-│   ├── map.html          # Map UI (Leaflet + dashboard.js)
-│   ├── style.css         # Dark hacker theme
-│   └── dashboard.js      # Map logic (filters, stats, reverse DNS refresh)
-├── data/
-│   ├── services.json     # External port→service mapping
-│   └── geoip/            # GeoIP database (GeoLite2-City.mmdb)
-├── schema.sql            # SQLite schema (unique constraints + indices)
-├── net_sentinel.db       # SQLite database
-└── README.md             # Project overview
+├── dashboard.py                        # Flask backend API
+├── data
+│   ├── geoip
+│   │   └── GeoLite2-City.mmdb          # GeoIP database (GeoLite2-City.mmdb)
+│   ├── services.json                   # External port→service mapping
+│   └── services_legend.txt
+├── ingest.sh                           # Runs parser scripts in /scripts
+├── logs
+│   └── parser-warnings.log
+├── net_sentinel.db                     # SQLite database
+├── README.md                           # Project overview
+├── schema.sql                          # SQLite schema (unique constraints + indices)
+├── scripts
+│   ├── batch_parser.py                 # Existing Log parser
+│   ├── live_parser.py                  # Live Log parser
+│   ├── parser_utils.py                 # Log parser and enrichment engine (GeoIP, reverse DNS, services)
+│   ├── __pycache__
+│   │   └── parser_utils.cpython-313.pyc
+│   └── trim_router_log.py               # Trims logs to most recent 30 Days
+├── setup-log-server.sh                  # Configures rsyslog to receive logs from a router
+├── setup.sh                             # One-time setup script (deps, GeoIP, schema)
+└── static                               # Frontend files
+    ├── dashboard.js                     # Map logic (filters, stats, reverse DNS refresh)
+    ├── map.html                         # Map UI (Leaflet + dashboard.js)
+    └── style.css                        # UI theme
 ```
 ---
 ## 🧪 Requirements
