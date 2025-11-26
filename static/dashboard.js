@@ -103,11 +103,6 @@ function addTimeFilterControl() {
         <option value="INBOUND">Inbound</option>
         <option value="OUTBOUND">Outbound</option>
       </select>
-    `;
-    return div;
-  };
-  control.addTo(map);
-}
 
       <!-- Service category filter -->
       <select id="serviceCategoryFilter" onchange="onFilterChange()">
