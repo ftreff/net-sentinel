@@ -119,11 +119,12 @@ def enrich_event(event):
     return event
 
 def insert_events(events):
-    if not events: return
-    conn=sqlite3.connect(DB_PATH)
+    if not events:
+        return
+    conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        c=conn.cursor()
+        # WAL mode should be set once at DB init, not every insert
+        c = conn.cursor()
         c.executemany("""
             INSERT INTO ip_events (
                 src_ip,src_rdns,src_port,src_service,
@@ -134,27 +135,16 @@ def insert_events(events):
                 city,state,country,country_code,latitude,longitude
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(src_ip,dst_ip,src_port,dst_port,proto,verdict,direction)
-            DO UPDATE SET
-                src_rdns=excluded.src_rdns,
-                dst_rdns=excluded.dst_rdns,
-                src_service=excluded.src_service,
-                dst_service=excluded.dst_service,
-                timestamp=excluded.timestamp,
-                city=excluded.city,
-                state=excluded.state,
-                country=excluded.country,
-                country_code=excluded.country_code,
-                latitude=excluded.latitude,
-                longitude=excluded.longitude,
-                hit_count=hit_count+excluded.hit_count
-        """,[(
-            e.get("src_ip"),e.get("src_rdns"),e.get("src_port"),e.get("src_service"),
-            e.get("dst_ip"),e.get("dst_rdns"),e.get("dst_port"),e.get("dst_service"),
-            e.get("proto"),e.get("in_if"),e.get("out_if"),
-            e.get("verdict"),e.get("direction"),
-            e.get("timestamp"),e.get("hit_count"),
-            e.get("city"),e.get("state"),e.get("country"),e.get("country_code"),
-            e.get("latitude"),e.get("longitude")
+            DO NOTHING
+        """, [(
+            e.get("src_ip"), e.get("src_rdns"), e.get("src_port"), e.get("src_service"),
+            e.get("dst_ip"), e.get("dst_rdns"), e.get("dst_port"), e.get("dst_service"),
+            e.get("proto"), e.get("in_if"), e.get("out_if"),
+            e.get("verdict"), e.get("direction"),
+            e.get("timestamp"), e.get("hit_count"),
+            e.get("city"), e.get("state"), e.get("country"), e.get("country_code"),
+            e.get("latitude"), e.get("longitude")
         ) for e in events])
         conn.commit()
-    finally: conn.close()
+    finally:
+        conn.close()
