@@ -37,11 +37,12 @@ CREATE TABLE IF NOT EXISTS ip_events (
     longitude REAL,
 
     -- Optional trace path
-    trace_path TEXT,
-
-    -- Deduplication: same src/dst/proto/verdict/direction considered one event
-    UNIQUE(src_ip, dst_ip, src_port, dst_port, proto, verdict, direction)
+    trace_path TEXT
 );
+
+-- Uniqueness constraint: same src/dst/proto/verdict/direction considered one event
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ip_events_unique
+ON ip_events (src_ip, dst_ip, src_port, dst_port, proto, verdict, direction);
 
 -- Indexes for query performance
 CREATE INDEX IF NOT EXISTS idx_src_ip ON ip_events(src_ip);
