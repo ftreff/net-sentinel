@@ -42,10 +42,14 @@ function initMap() {
     .then(res => res.json())
     .then(data => {
       services = data;
+      const timeSelect = document.getElementById("timeRange");
+      if (timeSelect) timeSelect.value = "24h"; // enforce default
       onFilterChange(); // initial load using current filters
-    })
+  })
     .catch(err => {
       console.error("Failed to load services.json:", err);
+      const timeSelect = document.getElementById("timeRange");
+      if (timeSelect) timeSelect.value = "24h"; // enforce default even if services fail
       onFilterChange(); // still load with Unknown services
     });
 }
@@ -83,7 +87,7 @@ function addTimeFilterControl() {
         <option value="1h">Last 1 hour</option>
         <option value="6h">Last 6 hours</option>
         <option value="12h">Last 12 hours</option>
-        <option value="24h">Last 24 hours</option>
+        <option value="24h" selected>Last 24 hours</option>
         <option value="7d">Last 7 days</option>
         <option value="15d">Last 15 days</option>
         <option value="30d">Last 30 days</option>
