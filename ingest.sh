@@ -8,6 +8,13 @@
 #     --preload-30          : run batch_parser against the 30-day archive to populate archive table
 #     --use-30              : start live_parser reading the 30-day archive instead of the 7-day working log
 #
+# Notes:
+#   - The live parser reads the system live log by default (/var/log/router.log).
+#     That file is typically only readable by root, so this script launches the
+#     live parser with sudo by default to ensure it can read the live router log.
+#   - If you prefer not to use sudo, run the live parser manually with appropriate
+#     permissions or set USE_30=1 / --use-30 to read the project archive instead.
+#
 # Examples:
 #   ./ingest.sh background
 #   ./ingest.sh foreground --use-30
@@ -71,9 +78,16 @@ if [ "$BATCH_STEP_DONE" = false ]; then
 fi
 
 echo "[3/4] Launching live parser..."
+# The live parser reads /var/log/router.log by default (unless --use-30 or --log-file is used).
+# /var/log/router.log is typically only readable by root; we run the live parser with sudo by default.
 LIVE_CMD=(sudo python3 "$SCRIPTS_DIR/live_parser.py")
 if [ "$USE_30" = true ]; then
   LIVE_CMD+=(--use-30)
+fi
+
+# Inform the user about sudo usage when tailing the system log
+if [ "$USE_30" = false ]; then
+  echo "ℹ️ Live parser will attempt to read /var/log/router.log and is being launched with sudo to ensure access."
 fi
 
 if [ "$MODE" = "foreground" ]; then
