@@ -1,29 +1,126 @@
 #!/usr/bin/env python3
 """
-Live parser: tail /var/log/router.log and insert new lines into net_sentinel.db in real time.
-Uses parser_utils for parsing, enrichment, and DB insertion.
+Live parser: tail project logs/router.log (7-day) or logs/last30router.log (30-day)
+and insert new lines into net_sentinel.db in real time.
+- By default reads [project]/logs/router.log
+- Use --use-30 or set USE_30=1 to read [project]/logs/last30router.log
+- Supports --log-file to override
+- Handles log rotation by reopening file when inode/size changes
+- Batches inserts to reduce DB pressure and flushes periodically on idle
 """
 
-import os, time
+import os
+import time
+import argparse
+from datetime import datetime, timezone
 from parser_utils import parse_log_line, enrich_event, insert_events
 
-LOG_FILE = "/var/log/router.log"
+# Project-aware defaults
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
+DEFAULT_LOG_7 = os.path.join(LOGS_DIR, "router.log")
+DEFAULT_LOG_30 = os.path.join(LOGS_DIR, "last30router.log")
+
+DEFAULT_BATCH_SIZE = int(os.environ.get("LIVE_BATCH_SIZE", "100"))
+IDLE_FLUSH_SECONDS = float(os.environ.get("LIVE_IDLE_FLUSH", "2.0"))
+SLEEP_INTERVAL = float(os.environ.get("LIVE_SLEEP_INTERVAL", "0.5"))
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Live tail parser for router logs")
+    p.add_argument("--use-30", action="store_true",
+                   help="Read the 30-day archive ([project]/logs/last30router.log) instead of the 7-day working log")
+    p.add_argument("--log-file", type=str, default=None,
+                   help="Explicit log file to read (overrides --use-30 and defaults)")
+    p.add_argument("--batch-size", type=int, default=None,
+                   help="Override batch size for inserts")
+    return p.parse_args()
+
+def open_log(path):
+    """Open file and return (fileobj, inode, position)."""
+    f = open(path, "r", encoding="utf-8", errors="replace")
+    try:
+        st = os.fstat(f.fileno())
+        inode = (st.st_ino, st.st_dev)
+    except Exception:
+        inode = None
+    # Seek to end to behave like tail -f
+    f.seek(0, os.SEEK_END)
+    pos = f.tell()
+    return f, inode, pos
+
+def file_changed(path, last_inode, last_pos):
+    """Detect rotation/truncation by inode or file size smaller than last_pos."""
+    try:
+        st = os.stat(path)
+        inode = (st.st_ino, st.st_dev)
+        size = st.st_size
+        if last_inode is None:
+            return False
+        if inode != last_inode:
+            return True
+        if size < last_pos:
+            return True
+        return False
+    except Exception:
+        return True
 
 def main():
-    if not os.path.exists(LOG_FILE):
-        print(f"[live_parser] {LOG_FILE} not found.")
+    args = parse_args()
+    env_use_30 = os.environ.get("USE_30", "") not in ("", "0", "false", "False")
+    use_30 = args.use_30 or env_use_30
+
+    if args.log_file:
+        log_file = args.log_file
+    else:
+        log_file = DEFAULT_LOG_30 if use_30 else DEFAULT_LOG_7
+
+    batch_size = args.batch_size if args.batch_size and args.batch_size > 0 else DEFAULT_BATCH_SIZE
+
+    if not os.path.exists(log_file):
+        print(f"[live_parser] {log_file} not found.")
         return
 
-    print(f"[live_parser] Watching {LOG_FILE} for new lines...")
+    print(f"[live_parser] Watching {log_file} for new lines... (batch_size={batch_size})")
 
     batch = []
-    with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-        f.seek(0, os.SEEK_END)  # start at end of file
+    last_activity = time.time()
+
+    try:
+        f, inode, pos = open_log(log_file)
+    except Exception as e:
+        print(f"[live_parser] Failed to open {log_file}: {e}")
+        return
+
+    try:
         while True:
             line = f.readline()
             if not line:
-                time.sleep(0.5)
+                # No new line: check for rotation/truncation
+                if file_changed(log_file, inode, pos):
+                    try:
+                        f.close()
+                    except Exception:
+                        pass
+                    try:
+                        f, inode, pos = open_log(log_file)
+                        print(f"[live_parser] Reopened log file {log_file} after rotation/truncation at {datetime.now(timezone.utc).isoformat()}")
+                    except Exception as e:
+                        print(f"[live_parser] Error reopening {log_file}: {e}")
+                        time.sleep(SLEEP_INTERVAL)
+                        continue
+                # Idle flush if we've accumulated events but no new lines for a bit
+                if batch and (time.time() - last_activity) >= IDLE_FLUSH_SECONDS:
+                    try:
+                        insert_events(batch)
+                        print(f"[live_parser] Flushed {len(batch)} events (idle flush).")
+                    except Exception as e:
+                        print(f"[live_parser] Error inserting batch: {e}")
+                    batch = []
+                time.sleep(SLEEP_INTERVAL)
                 continue
+
+            pos = f.tell()
+            last_activity = time.time()
 
             parsed = parse_log_line(line)
             if not parsed:
@@ -31,15 +128,29 @@ def main():
             event = enrich_event(parsed)
             batch.append(event)
 
-            if len(batch) >= 100:  # smaller batch for live mode
-                insert_events(batch)
+            if len(batch) >= batch_size:
+                try:
+                    insert_events(batch)
+                    print(f"[live_parser] Inserted {len(batch)} events.")
+                except Exception as e:
+                    print(f"[live_parser] Error inserting batch: {e}")
                 batch = []
 
-            # flush immediately if needed
-            if batch:
+    except KeyboardInterrupt:
+        print("[live_parser] Interrupted by user, flushing remaining events...")
+    except Exception as e:
+        print(f"[live_parser] Unexpected error: {e}")
+    finally:
+        if batch:
+            try:
                 insert_events(batch)
-                batch = []
+                print(f"[live_parser] Final flush: inserted {len(batch)} events.")
+            except Exception as e:
+                print(f"[live_parser] Error on final flush: {e}")
+        try:
+            f.close()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
-
