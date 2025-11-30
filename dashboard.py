@@ -8,8 +8,20 @@ DB_PATH = "net_sentinel.db"
 
 def get_db():
     if "db" not in g:
-        conn = sqlite3.connect(DB_PATH)
+        # Increase timeout so operations wait for locks instead of failing fast
+        # check_same_thread=False is safe here because Flask creates one connection per request (g)
+        conn = sqlite3.connect(DB_PATH, timeout=30, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+
+        # Ensure WAL mode and sane sync for better concurrency (idempotent)
+        try:
+            cur = conn.cursor()
+            cur.execute("PRAGMA journal_mode=WAL;")
+            cur.execute("PRAGMA synchronous=NORMAL;")
+            cur.close()
+        except Exception as e:
+            app.logger.warning(f"Failed to set PRAGMA on DB: {e}")
+
         g.db = conn
     return g.db
 
