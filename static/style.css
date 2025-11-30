@@ -1,40 +1,61 @@
-body {
-  background-color: #0d0d0d;
-  color: #00ffcc;
-  font-family: 'Courier New', monospace;
+/* style.css
+   Net Sentinel — unified UI + Statistics styling
+   Replace your current static/style.css with this file.
+*/
+
+:root{
+  --ns-bg: #0d0d0d;
+  --ns-accent: #00ffcc;
+  --ns-panel: #111;
+  --ns-border: rgba(0,255,204,0.08);
+  --ns-font: 'Courier New', monospace;
+}
+
+/* Page base */
+html, body {
+  height: 100%;
   margin: 0;
   padding: 0;
+  background-color: var(--ns-bg);
+  color: var(--ns-accent);
+  font-family: var(--ns-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Generic controls */
 button, select {
   background-color: #111;
-  color: #00ffcc;
-  border: 1px solid #00ffcc;
+  color: var(--ns-accent);
+  border: 1px solid var(--ns-accent);
   padding: 6px 12px;
   margin: 4px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--ns-font);
   cursor: pointer;
 }
-
 button:hover, select:hover {
-  background-color: #00ffcc;
+  background-color: var(--ns-accent);
   color: #000;
 }
 
+/* Map container */
 #map {
   height: 100vh;
   width: 100%;
+  box-sizing: border-box;
 }
 
+/* Info window */
 .info-window {
-  background-color: #111;
-  color: #00ffcc;
+  background-color: var(--ns-panel);
+  color: var(--ns-accent);
   font-size: 12px;
   padding: 6px;
   border-radius: 4px;
-  font-family: monospace;
+  font-family: var(--ns-font);
 }
 
+/* Decorative overlay for dark mode */
 body.dark::after {
   content: "";
   position: fixed;
@@ -51,51 +72,36 @@ body.dark::after {
   z-index: 9999;
 }
 
-/* === Cluster Styling === */
-.marker-cluster-small {
-  background-color: rgba(0, 255, 204, 0.4);
-  color: #000;
-}
-.marker-cluster-medium {
-  background-color: rgba(0, 255, 204, 0.6);
-  color: #000;
-}
-.marker-cluster-large {
-  background-color: rgba(0, 255, 204, 0.8);
-  color: #000;
-}
+/* Marker cluster styling */
+.marker-cluster-small { background-color: rgba(0,255,204,0.4); color: #000; }
+.marker-cluster-medium { background-color: rgba(0,255,204,0.6); color: #000; }
+.marker-cluster-large { background-color: rgba(0,255,204,0.8); color: #000; }
 
 .marker-cluster div {
-  background-color: #00ffcc;
-  border: 2px solid #0d0d0d;
+  background-color: var(--ns-accent);
+  border: 2px solid var(--ns-bg);
   border-radius: 50%;
   color: #000;
-  font-family: 'Courier New', monospace;
+  font-family: var(--ns-font);
   font-weight: bold;
 }
+.marker-cluster span { line-height: 30px; font-size: 14px; }
 
-.marker-cluster span {
-  line-height: 30px;
-  font-size: 14px;
-}
-
-/* === Stats box minimize/restore styles ===
-   Designed to match the project's dark, neon-green aesthetic.
-   Add an element with id="stats-box" in your HTML for this to apply.
-*/
+/* === Stats box base === */
 #stats-box {
-  position: relative;
-  background-color: #111;
-  color: #00ffcc;
-  border: 1px solid rgba(0,255,204,0.15);
-  border-radius: 6px;
-  overflow: hidden;
-  transition: height 220ms ease, opacity 180ms ease;
-  max-width: 800px;
-  font-family: 'Courier New', monospace;
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 1000;
+  width: 800px;
+  max-height: 60vh;
+  overflow: auto;
+  box-sizing: border-box;
+  font-family: var(--ns-font);
+  color: var(--ns-accent);
 }
 
-/* Header area for the stats box */
+/* Header */
 #stats-box .stats-header {
   display: flex;
   align-items: center;
@@ -103,45 +109,34 @@ body.dark::after {
   padding: 8px 10px;
   border-bottom: 1px solid rgba(0,255,204,0.06);
   background: linear-gradient(180deg, rgba(0,0,0,0.12), transparent);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 13px;
+  color: var(--ns-accent);
 }
-
-/* Title in header */
-#stats-box .stats-title {
-  color: #00ffcc;
-  font-family: 'Courier New', monospace;
-}
+#stats-box .stats-title { color: var(--ns-accent); font-family: var(--ns-font); }
 
 /* Toggle button */
 #stats-toggle {
   background: transparent;
   border: 1px solid rgba(0,255,204,0.12);
-  color: #00ffcc;
+  color: var(--ns-accent);
   padding: 4px 8px;
   font-size: 14px;
   line-height: 1;
   border-radius: 4px;
   cursor: pointer;
 }
-#stats-toggle:hover {
-  background-color: #00ffcc;
-  color: #000;
-  border-color: #00ffcc;
-}
+#stats-toggle:hover { background-color: var(--ns-accent); color: #000; border-color: var(--ns-accent); }
 
-/* Content area that will be hidden when minimized */
+/* Content area */
 #stats-box .stats-content {
   padding: 10px;
   transition: opacity 180ms ease, height 180ms ease, padding 180ms ease;
   opacity: 1;
 }
 
-/* Minimized state: keep header visible, hide content */
-#stats-box.minimized {
-  height: 44px; /* header height only */
-  opacity: 0.98;
-}
+/* Minimized state */
+#stats-box.minimized { height: 44px; opacity: 0.98; }
 #stats-box.minimized .stats-content {
   opacity: 0;
   pointer-events: none;
@@ -149,13 +144,142 @@ body.dark::after {
   padding: 0 10px;
 }
 
-/* Small responsive tweak */
-@media (max-width: 480px) {
-  #stats-box {
-    max-width: 100%;
-    width: calc(100% - 20px);
-  }
-  #stats-box.minimized {
-    height: 44px;
-  }
+/* Stats panel card */
+.stats-bar {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px;
+  color: var(--ns-accent);
+  font-size: 13px;
+  line-height: 1.4;
+  border-radius: 4px;
+  max-width: 800px;
+  white-space: normal;
+  border: 1px solid rgba(0,255,204,0.04);
+  box-sizing: border-box;
 }
+
+/* Top summary row */
+.stats-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Add a little right padding so numbers don't butt up against the scrollbar */
+.stats-summary > div {
+  padding-right: 10px;
+}
+
+/* Divider */
+.stats-bar hr {
+  border: none;
+  border-top: 1px solid var(--ns-border);
+  margin: 8px 0;
+}
+
+/* === Columns layout for Top Countries and Top Ports === */
+.stats-columns {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+/* Column base */
+.stats-col {
+  box-sizing: border-box;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+/* Make Top Countries narrower and Top Ports wider */
+.stats-col.countries {
+  flex: 0 0 250px;   /* narrower base width for countries */
+  max-width: 330px;
+  min-width: 120px;
+}
+.stats-col.ports {
+  flex: 1 1 640px;   /* wider base width for ports */
+  min-width: 260px;
+  max-width: calc(100% - 100px);
+}
+
+/* Column headings */
+.stats-col h4 {
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: var(--ns-accent);
+  font-size: 13px;
+}
+
+/* Ordered lists */
+/* Add right padding so list content has breathing room before the scrollbar */
+.stats-col ol {
+  margin: 0 0 0 18px;
+  padding: 0 12px 0 0; /* right padding added */
+  max-height: 36vh;
+  overflow: auto;
+  color: var(--ns-accent);
+  font-size: 13px;
+  box-sizing: content-box;
+}
+
+/* List items */
+.stats-col ol li {
+  margin: 6px 0;
+  padding: 2px 0;
+  list-style-position: inside;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 6px; /* extra small padding to ensure numbers/text don't touch scrollbar */
+}
+
+/* Ports list: allow wrapping for long port descriptions */
+.stats-col.ports ol li {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Rank badge */
+.rank-badge {
+  display: inline-block;
+  min-width: 28px;
+  text-align: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(0,255,204,0.06);
+  color: var(--ns-accent);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+/* DataTables compatibility helpers (if you later integrate DataTables) */
+#stats-box .statistics .dt-col-country { width: 250px !important; }
+#stats-box .statistics .dt-col-ports { width: 640px !important; }
+.dataTables_wrapper #stats-box .statistics table { table-layout: fixed !important; }
+
+/* Responsive adjustments */
+@media (max-width: 980px) {
+  #stats-box { width: 92%; left: 4%; bottom: 10px; }
+  .stats-col.countries { flex: 0 0 90px; }
+  .stats-col.ports { flex: 1 1 260px; }
+  .stats-col ol { max-height: 30vh; padding-right: 8px; }
+}
+@media (max-width: 640px) {
+  #stats-box { width: calc(100% - 24px); left: 12px; right: 12px; bottom: 8px; }
+  .stats-columns { flex-direction: column; gap: 8px; }
+  .stats-col.countries, .stats-col.ports { flex: 1 1 auto; min-width: 0; max-width: 100%; }
+  .stats-col ol li { white-space: normal; }
+  .stats-bar { padding: 8px; font-size: 12px; }
+  .stats-col ol { padding-right: 8px; }
+}
+
+/* Accessibility focus outlines */
+#stats-toggle:focus,
+#stats-refresh:focus {
+  outline: 2px solid rgba(0,255,204,0.18);
+  outline-offset: 2px;
+}
+
