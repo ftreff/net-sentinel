@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Live parser: tail project logs/router.log (7-day) or logs/last30router.log (30-day)
-and insert new lines into net_sentinel.db in real time.
-- By default reads [project]/logs/router.log
-- Use --use-30 or set USE_30=1 to read [project]/logs/last30router.log
+Live parser: tail system or project router logs and insert new lines into net_sentinel.db in real time.
+- By default reads /var/log/router.log (system live log)
+- Use --use-30 or set USE_30=1 to read [project]/logs/last30router.log (30-day archive)
 - Supports --log-file to override
 - Handles log rotation by reopening file when inode/size changes
 - Batches inserts to reduce DB pressure and flushes periodically on idle
@@ -18,7 +17,9 @@ from parser_utils import parse_log_line, enrich_event, insert_events
 # Project-aware defaults
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
-DEFAULT_LOG_7 = os.path.join(LOGS_DIR, "router.log")
+# Use system live router log by default
+DEFAULT_LOG_7 = "/var/log/router.log"
+# 30-day archive remains in project logs
 DEFAULT_LOG_30 = os.path.join(LOGS_DIR, "last30router.log")
 
 DEFAULT_BATCH_SIZE = int(os.environ.get("LIVE_BATCH_SIZE", "100"))
@@ -28,7 +29,7 @@ SLEEP_INTERVAL = float(os.environ.get("LIVE_SLEEP_INTERVAL", "0.5"))
 def parse_args():
     p = argparse.ArgumentParser(description="Live tail parser for router logs")
     p.add_argument("--use-30", action="store_true",
-                   help="Read the 30-day archive ([project]/logs/last30router.log) instead of the 7-day working log")
+                   help="Read the 30-day archive ([project]/logs/last30router.log) instead of the system live log")
     p.add_argument("--log-file", type=str, default=None,
                    help="Explicit log file to read (overrides --use-30 and defaults)")
     p.add_argument("--batch-size", type=int, default=None,
@@ -63,7 +64,7 @@ def file_changed(path, last_inode, last_pos):
         return False
     except Exception:
         return True
-
+        
 def main():
     args = parse_args()
     env_use_30 = os.environ.get("USE_30", "") not in ("", "0", "false", "False")
@@ -72,15 +73,19 @@ def main():
     if args.log_file:
         log_file = args.log_file
     else:
+        # If use_30 is requested, read the project 30-day archive; otherwise read system live log
         log_file = DEFAULT_LOG_30 if use_30 else DEFAULT_LOG_7
 
     batch_size = args.batch_size if args.batch_size and args.batch_size > 0 else DEFAULT_BATCH_SIZE
 
+    # Choose target DB table based on whether we're processing 30-day archive
+    target_table = "ip_events_30" if use_30 else "ip_events"
+
     if not os.path.exists(log_file):
-        print(f"[live_parser] {log_file} not found.")
+        print(f"[live_parser] {log_file} not found. If this is the system log (/var/log/router.log) you may need to run with sudo or ensure the file exists.")
         return
 
-    print(f"[live_parser] Watching {log_file} for new lines... (batch_size={batch_size})")
+    print(f"[live_parser] Watching {log_file} for new lines... (batch_size={batch_size}, target_table={target_table})")
 
     batch = []
     last_activity = time.time()
@@ -111,8 +116,8 @@ def main():
                 # Idle flush if we've accumulated events but no new lines for a bit
                 if batch and (time.time() - last_activity) >= IDLE_FLUSH_SECONDS:
                     try:
-                        insert_events(batch)
-                        print(f"[live_parser] Flushed {len(batch)} events (idle flush).")
+                        insert_events(batch, table=target_table)
+                        print(f"[live_parser] Flushed {len(batch)} events (idle flush) into {target_table}.")
                     except Exception as e:
                         print(f"[live_parser] Error inserting batch: {e}")
                     batch = []
@@ -130,8 +135,8 @@ def main():
 
             if len(batch) >= batch_size:
                 try:
-                    insert_events(batch)
-                    print(f"[live_parser] Inserted {len(batch)} events.")
+                    insert_events(batch, table=target_table)
+                    print(f"[live_parser] Inserted {len(batch)} events into {target_table}.")
                 except Exception as e:
                     print(f"[live_parser] Error inserting batch: {e}")
                 batch = []
@@ -143,8 +148,8 @@ def main():
     finally:
         if batch:
             try:
-                insert_events(batch)
-                print(f"[live_parser] Final flush: inserted {len(batch)} events.")
+                insert_events(batch, table=target_table)
+                print(f"[live_parser] Final flush: inserted {len(batch)} events into {target_table}.")
             except Exception as e:
                 print(f"[live_parser] Error on final flush: {e}")
         try:
