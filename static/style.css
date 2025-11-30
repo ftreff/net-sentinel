@@ -1,6 +1,6 @@
 /* style.css
    Net Sentinel — unified UI + Statistics styling
-   Replace your current static/style.css with this file.
+   Updated to match marker colors: red (#ff0000) and green (#00ff00)
 */
 
 :root{
@@ -87,30 +87,32 @@ body.dark::after {
 }
 .marker-cluster span { line-height: 30px; font-size: 14px; }
 
-/* Cluster variants for accepted and dropped groups */
+/* Cluster variants for accepted and dropped groups (match chosen colors) */
 .marker-cluster-accepted div {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(0,255,204,0.95);
+  background: #00ff00; /* vivid green */
   display: inline-block;
   text-align: center;
   line-height: 40px;
   font-weight: 700;
   color: #000;
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  border: 2px solid rgba(0,0,0,0.12);
 }
 .marker-cluster-dropped div {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: rgba(255,107,107,0.95);
+  background: #ff0000; /* vivid red */
   display: inline-block;
   text-align: center;
   line-height: 40px;
   font-weight: 700;
   color: #000;
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  border: 2px solid rgba(0,0,0,0.12);
 }
 
 /* Event dot icon (used for individual markers) */
@@ -120,14 +122,14 @@ body.dark::after {
   pointer-events: auto;
 }
 
-/* The visible dot */
+/* The visible dot (matches JS colors: red/green applied inline) */
 .event-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 12px;            /* slightly larger for visibility */
+  height: 12px;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.6);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.5);
   vertical-align: middle;
 }
 
