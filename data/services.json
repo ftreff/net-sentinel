@@ -1,5 +1,5 @@
 {
-  "63407": "Local BT SET PORT 🏴‍☠️",
+  "63449": "BT Local Set uTP Port 🏴‍☠️",
   "20": "FTP-Data 🌐",
   "21": "FTP 🎯",
   "22": "SSH 🎯",             
@@ -149,9 +149,10 @@
   "51820": "WireGuard 💻",
   "53000": "Custom-HTTP 🌐",
   "58169": "Malicious Network Activity ⚠️",
-  "63783": "BitTorrent 🏴‍☠️",
+  "63783": "qBitTorrent Default Incomming Port ⚠️🎯🏴‍☠️",
   "9042": "Cassandra 📊",
   "6667": "IRC 🎯",
+  "9090": "CockPit / Zuse / Remote Control / C&C ⚠️🎯",
   "12345": "NetBus/Legacy 🎯",
   "27374": "Sub7/Legacy 🎯",
   "18201": "uTorrent 3.6 (uTP) 🏴‍☠️",
