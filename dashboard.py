@@ -45,7 +45,12 @@ def get_events():
     country = request.args.get("country")
     port = request.args.get("port")
 
-    query = "SELECT * FROM ip_events WHERE 1=1"
+    # Honor use_30=1 / use_30=true to query the 30-day archive table
+    use_30_raw = request.args.get("use_30", "")
+    use_30 = str(use_30_raw).lower() in ("1", "true", "yes", "on")
+
+    table_name = "ip_events_30" if use_30 else "ip_events"
+    query = f"SELECT * FROM {table_name} WHERE 1=1"
     params = []
 
     if since:
@@ -128,16 +133,13 @@ def get_events():
             add_in_list([51413, 16881, 63783, 6969, 7021])  # specific ports seen in logs
         elif cat == "unknown":
             # Unknown: neither src nor dst match any known category
-            # Implement as NOT matching any of the above sets/ranges
             known_ports = [
                 80, 443, 8080, 8443,
                 25, 465, 587, 993, 995,
                 3306, 5432, 1433, 1521,
                 22, 3389, 5900, 5901,
-                # also include BitTorrent ports so they don’t get misclassified as Unknown
                 51413, 16881, 63783, 6969, 7021
             ]
-            # also cover the 6881–6999 range
             placeholders = ",".join(["?"] * len(known_ports))
             query += f" AND (CAST(src_port AS INTEGER) NOT IN ({placeholders}) AND CAST(dst_port AS INTEGER) NOT IN ({placeholders}))"
             params.extend(known_ports)
@@ -145,7 +147,6 @@ def get_events():
 
         # Attach positive category conditions if any were built
         if cat in ("web", "mail", "database", "remote", "bittorrent"):
-            # Combine src/dst conditions with OR
             query += " AND (" + " OR ".join(cat_conditions) + ")"
 
     # Frequency threshold: filter rows with hit_count greater than threshold
@@ -164,11 +165,11 @@ def get_events():
     for row in rows:
         events.append({
             "src_ip": row["src_ip"],
-            "src_rdns": row["src_rdns"],
+            "src_rdns": row.get("src_rdns") if isinstance(row, dict) else row["src_rdns"],
             "src_port": row["src_port"],
             "src_service": row["src_service"],
             "dst_ip": row["dst_ip"],
-            "dst_rdns": row["dst_rdns"],
+            "dst_rdns": row.get("dst_rdns") if isinstance(row, dict) else row["dst_rdns"],
             "dst_port": row["dst_port"],
             "dst_service": row["dst_service"],
             "proto": row["proto"],
