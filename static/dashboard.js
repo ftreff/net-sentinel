@@ -89,7 +89,6 @@ function addTimeFilterControl() {
         <option value="12h">Last 12 hours</option>
         <option value="24h" selected>Last 24 hours</option>
         <option value="7d">Last 7 days</option>
-        <option value="15d">Last 15 days</option>
         <option value="30d">Last 30 days</option>
       </select>
 
@@ -237,8 +236,13 @@ function resetFilters() {
   idsToReset.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
+    // For selects we want to reset to default; timeRange -> 24h, others -> empty
     if (el.tagName === "SELECT") {
-      el.value = "";
+      if (id === "timeRange") {
+        el.value = "24h";
+      } else {
+        el.value = "";
+      }
     } else {
       el.value = "";
     }
@@ -308,7 +312,9 @@ function onFilterChange() {
     directionVal = directionVal.toUpperCase(); // e.g. "Inbound" → "INBOUND"
   }
 
+  // Determine time cutoff and whether to use the 30-day archive dataset
   let since = null;
+  let use30 = false;
   if (timeVal) {
     const now = new Date();
     if (timeVal === "1min") now.setTime(now.getTime() - 1 * 60 * 1000);
@@ -320,8 +326,10 @@ function onFilterChange() {
     if (timeVal === "12h") now.setTime(now.getTime() - 12 * 60 * 60 * 1000);
     if (timeVal === "24h") now.setTime(now.getTime() - 24 * 60 * 60 * 1000);
     if (timeVal === "7d") now.setTime(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    if (timeVal === "15d") now.setTime(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    if (timeVal === "30d") now.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    if (timeVal === "30d") {
+      now.setTime(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      use30 = true;
+    }
     since = now.toISOString();
   }
 
@@ -332,7 +340,7 @@ function onFilterChange() {
     if (!isNaN(n)) frequencyThreshold = n;
   }
 
-  // Call loaders with normalized values
+  // Call loaders with normalized values and the use30 flag
   loadEvents(
     since,
     verdictVal,
@@ -343,7 +351,8 @@ function onFilterChange() {
     countryVal,
     portFinal,
     srcIpVal,
-    dstIpVal
+    dstIpVal,
+    use30
   );
   loadStats();
 }
@@ -358,7 +367,8 @@ function loadEvents(
   country = null,
   port = null,
   srcIp = null,
-  dstIp = null
+  dstIp = null,
+  use30 = false
 ) {
   let url = "/api/events";
   const params = [];
@@ -372,6 +382,8 @@ function loadEvents(
   if (port) params.push(`port=${encodeURIComponent(port)}`);
   if (srcIp) params.push(`src_ip=${encodeURIComponent(srcIp)}`);
   if (dstIp) params.push(`dst_ip=${encodeURIComponent(dstIp)}`);
+  // If the user requested 30-day view, tell the backend to use the 30-day archive dataset
+  if (use30) params.push("use_30=1");
   if (params.length) url += "?" + params.join("&");
 
   fetch(url)
