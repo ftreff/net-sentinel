@@ -15,34 +15,6 @@
 
   <!-- Custom styles -->
   <link rel="stylesheet" href="style.css" />
-
-  <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-    }
-    .stats-bar {
-      background: rgba(0, 0, 0, 0.7);
-      padding: 10px;
-      color: white;
-      font-size: 13px;
-      line-height: 1.4;
-      border-radius: 4px;
-      max-width: 800px;
-      white-space: normal;
-    }
-
-    /* Position the stats box as an overlay in the bottom-left corner */
-    #stats-box {
-      position: absolute;
-      bottom: 12px;
-      left: 12px;
-      z-index: 1000;
-      width: 800px;
-      max-height: 60vh;
-      overflow: auto;
-    }
-  </style>
 </head>
 <body>
   <div id="map"></div>
@@ -56,25 +28,25 @@
 
     <div class="stats-content">
       <div id="stats-body" class="stats-bar">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="stats-summary">
           <div><strong>DROP:</strong> <span id="stat-drop-count">—</span></div>
           <div><strong>ACCEPT:</strong> <span id="stat-accept-count">—</span></div>
           <div><button id="stats-refresh" title="Refresh statistics">Refresh</button></div>
         </div>
 
-        <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
+        <hr>
 
-        <div style="display:flex; gap:12px;">
-          <div style="flex:1; min-width:140px;">
-            <div style="font-weight:700; margin-bottom:6px;">Top Countries (20)</div>
-            <ol id="stat-top-countries" style="margin:0 0 0 18px; padding:0; max-height:36vh; overflow:auto;">
+        <div class="stats-columns">
+          <div class="stats-col countries">
+            <h4>Top Countries (20)</h4>
+            <ol id="stat-top-countries">
               <li>—</li>
             </ol>
           </div>
 
-          <div style="flex:1; min-width:140px;">
-            <div style="font-weight:700; margin-bottom:6px;">Top Ports (20)</div>
-            <ol id="stat-top-ports" style="margin:0 0 0 18px; padding:0; max-height:36vh; overflow:auto;">
+          <div class="stats-col ports">
+            <h4>Top Ports (20)</h4>
+            <ol id="stat-top-ports">
               <li>—</li>
             </ol>
           </div>
