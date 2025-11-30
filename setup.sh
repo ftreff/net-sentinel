@@ -1,6 +1,15 @@
 #!/bin/bash
-
+# --force-geoip option will force download of geoip db
 echo "🔧 Setting up Net Sentinel database..."
+
+# Parse optional flags
+FORCE_GEOIP=false
+for arg in "$@"; do
+  case "$arg" in
+    --force-geoip) FORCE_GEOIP=true; shift ;;
+    *) ;;
+  esac
+done
 
 # Create folder
 mkdir -p data/geoip
@@ -16,8 +25,6 @@ fi
 
 # Ensure WAL mode and sane synchronous setting (idempotent)
 echo "🛠️ Configuring SQLite pragmas (WAL, synchronous=NORMAL)..."
-# Use sqlite3 CLI to set journal_mode to WAL and synchronous to NORMAL.
-# These commands are safe to run repeatedly.
 sqlite3 net_sentinel.db "PRAGMA journal_mode=WAL;" >/dev/null 2>&1 || true
 sqlite3 net_sentinel.db "PRAGMA synchronous=NORMAL;" >/dev/null 2>&1 || true
 
@@ -56,40 +63,45 @@ EOF
 # Decide whether to download
 need_download=false
 
-if [ ! -f "$GEOIP_DB" ]; then
-  echo "🌍 GeoIP database missing — will download."
+if [ "$FORCE_GEOIP" = true ]; then
+  echo "⚡ --force-geoip specified: forcing GeoIP download/update."
   need_download=true
 else
-  # If we have a saved meta file, compare ETag first
-  if [ -f "$GEOIP_META" ] && [ -n "$remote_etag" ]; then
-    saved_etag=$(awk -F= '/^ETAG=/{print substr($0,6)}' "$GEOIP_META" || true)
-    if [ "$saved_etag" != "$remote_etag" ]; then
-      echo "🌍 Remote ETag changed (saved: ${saved_etag:-none}, remote: ${remote_etag}) — will update."
-      need_download=true
-    else
-      echo "🌍 ETag unchanged; skipping download."
-    fi
-  elif [ -n "$remote_lastmod" ]; then
-    # Compare remote Last-Modified to local file mtime
-    remote_epoch=$(date -d "$remote_lastmod" +%s 2>/dev/null || echo "")
-    local_epoch=$(stat -c %Y "$GEOIP_DB" 2>/dev/null || echo 0)
-    if [ -n "$remote_epoch" ] && [ "$remote_epoch" -gt "$local_epoch" ]; then
-      echo "🌍 Remote file is newer (Last-Modified: $remote_lastmod) — will update."
-      need_download=true
-    else
-      echo "🌍 Remote Last-Modified not newer; skipping download."
-    fi
-  elif [ -n "$remote_size" ]; then
-    # Fallback: compare sizes
-    local_size=$(stat -c %s "$GEOIP_DB" 2>/dev/null || echo 0)
-    if [ "$remote_size" != "" ] && [ "$remote_size" -ne "$local_size" ]; then
-      echo "🌍 Remote Content-Length differs (local: $local_size, remote: $remote_size) — will update."
-      need_download=true
-    else
-      echo "🌍 Remote size matches local; skipping download."
-    fi
+  if [ ! -f "$GEOIP_DB" ]; then
+    echo "🌍 GeoIP database missing — will download."
+    need_download=true
   else
-    echo "⚠️ Could not determine remote metadata; skipping automatic update to avoid unnecessary downloads."
+    # If we have a saved meta file, compare ETag first
+    if [ -f "$GEOIP_META" ] && [ -n "$remote_etag" ]; then
+      saved_etag=$(awk -F= '/^ETAG=/{print substr($0,6)}' "$GEOIP_META" || true)
+      if [ "$saved_etag" != "$remote_etag" ]; then
+        echo "🌍 Remote ETag changed (saved: ${saved_etag:-none}, remote: ${remote_etag}) — will update."
+        need_download=true
+      else
+        echo "🌍 ETag unchanged; skipping download."
+      fi
+    elif [ -n "$remote_lastmod" ]; then
+      # Compare remote Last-Modified to local file mtime
+      remote_epoch=$(date -d "$remote_lastmod" +%s 2>/dev/null || echo "")
+      local_epoch=$(stat -c %Y "$GEOIP_DB" 2>/dev/null || echo 0)
+      if [ -n "$remote_epoch" ] && [ "$remote_epoch" -gt "$local_epoch" ]; then
+        echo "🌍 Remote file is newer (Last-Modified: $remote_lastmod) — will update."
+        need_download=true
+      else
+        echo "🌍 Remote Last-Modified not newer; skipping download."
+      fi
+    elif [ -n "$remote_size" ]; then
+      # Fallback: compare sizes
+      local_size=$(stat -c %s "$GEOIP_DB" 2>/dev/null || echo 0)
+      if [ "$remote_size" != "" ] && [ "$remote_size" -ne "$local_size" ]; then
+        echo "🌍 Remote Content-Length differs (local: $local_size, remote: $remote_size) — will update."
+        need_download=true
+      else
+        echo "🌍 Remote size matches local; skipping download."
+      fi
+    else
+      echo "⚠️ Could not determine remote metadata; skipping automatic update to avoid unnecessary downloads."
+    fi
   fi
 fi
 
@@ -109,6 +121,8 @@ if [ "$need_download" = true ]; then
     echo "❌ Failed to download GeoIP database; leaving existing file in place."
     rm -f "$tmpfile"
   fi
+else
+  echo "ℹ️ No GeoIP update required."
 fi
 
 echo "✅ Setup complete."
