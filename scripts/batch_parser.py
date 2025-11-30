@@ -1,20 +1,53 @@
 #!/usr/bin/env python3
 """
-Batch parser: load all lines from /var/log/router.log into net_sentinel.db.
+Batch parser: load lines from the trimmed project logs into net_sentinel.db.
+- By default reads [project]/logs/router.log (7-day working file).
+- Use --use-30 or set USE_30=1 to read [project]/logs/last30router.log (30-day archive).
+- You can also override the input file with --log-file.
 Uses parser_utils for parsing, enrichment, and DB insertion.
 Shows progress with tqdm.
 """
 
 import os
+import argparse
 from tqdm import tqdm
 from parser_utils import parse_log_line, enrich_event, insert_events
 
-LOG_FILE = "/var/log/router.log"
-BATCH_SIZE = 1000
+# Project-aware defaults
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
+DEFAULT_LOG_7 = os.path.join(LOGS_DIR, "router.log")
+DEFAULT_LOG_30 = os.path.join(LOGS_DIR, "last30router.log")
+
+BATCH_SIZE = int(os.environ.get("BATCH_SIZE", "1000"))
+
+def parse_args():
+    p = argparse.ArgumentParser(description="Batch parse router logs into net_sentinel.db")
+    p.add_argument("--use-30", action="store_true",
+                   help="Read the 30-day archive ([project]/logs/last30router.log) instead of the 7-day working log")
+    p.add_argument("--log-file", type=str, default=None,
+                   help="Explicit log file to read (overrides --use-30 and defaults)")
+    p.add_argument("--batch-size", type=int, default=None,
+                   help="Override batch size for inserts")
+    return p.parse_args()
 
 def main():
-    if not os.path.exists(LOG_FILE):
-        print(f"[batch_parser] {LOG_FILE} not found or not readable.")
+    args = parse_args()
+
+    # Allow env var to force 30-day file
+    env_use_30 = os.environ.get("USE_30", "") not in ("", "0", "false", "False")
+    use_30 = args.use_30 or env_use_30
+
+    # Determine which file to read
+    if args.log_file:
+        log_file = args.log_file
+    else:
+        log_file = DEFAULT_LOG_30 if use_30 else DEFAULT_LOG_7
+
+    batch_size = args.batch_size if args.batch_size and args.batch_size > 0 else BATCH_SIZE
+
+    if not os.path.exists(log_file):
+        print(f"[batch_parser] {log_file} not found or not readable.")
         return
 
     batch = []
@@ -22,29 +55,34 @@ def main():
 
     # Count lines for progress bar
     try:
-        total_lines = sum(1 for _ in open(LOG_FILE, "r", encoding="utf-8", errors="replace"))
+        with open(log_file, "r", encoding="utf-8", errors="replace") as fh:
+            total_lines = sum(1 for _ in fh)
     except Exception as e:
-        print(f"[batch_parser] Error reading {LOG_FILE}: {e}")
+        print(f"[batch_parser] Error reading {log_file}: {e}")
         return
 
-    with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as f:
-        for line in tqdm(f, total=total_lines, desc="Parsing router.log", unit="line"):
-            parsed = parse_log_line(line)
-            if not parsed:
-                continue
-            event = enrich_event(parsed)
-            batch.append(event)
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            for line in tqdm(f, total=total_lines, desc=f"Parsing {os.path.basename(log_file)}", unit="line"):
+                parsed = parse_log_line(line)
+                if not parsed:
+                    continue
+                event = enrich_event(parsed)
+                batch.append(event)
 
-            if len(batch) >= BATCH_SIZE:
-                insert_events(batch)
-                inserted += len(batch)
-                batch = []
+                if len(batch) >= batch_size:
+                    insert_events(batch)
+                    inserted += len(batch)
+                    batch = []
 
-    if batch:
-        insert_events(batch)
-        inserted += len(batch)
+        if batch:
+            insert_events(batch)
+            inserted += len(batch)
 
-    print(f"[batch_parser] ✅ Inserted {inserted} events from {LOG_FILE}")
+        print(f"[batch_parser] ✅ Inserted {inserted} events from {log_file}")
+
+    except Exception as e:
+        print(f"[batch_parser] Error during parsing/insertion: {e}")
 
 if __name__ == "__main__":
     main()
