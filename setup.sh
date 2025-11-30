@@ -27,6 +27,46 @@ else
   sqlite3 net_sentinel.db < schema.sql
 fi
 
+# --- Ensure event_hash column + unique indexes exist (idempotent) ---
+echo "🔁 Ensuring event_hash column and unique indexes..."
+
+# Helper: check if a column exists in a table
+column_exists() {
+  local db="$1"; local table="$2"; local col="$3"
+  sqlite3 "$db" "PRAGMA table_info('$table');" \
+    | awk -F'|' '{print $2}' \
+    | grep -x -- "$col" >/dev/null 2>&1
+}
+
+DB_FILE="net_sentinel.db"
+
+# ip_events
+if column_exists "$DB_FILE" "ip_events" "event_hash"; then
+  echo "ℹ️ ip_events.event_hash already present"
+else
+  echo "➕ Adding event_hash to ip_events"
+  sqlite3 "$DB_FILE" "ALTER TABLE ip_events ADD COLUMN event_hash TEXT;" \
+    || echo "⚠️ ALTER TABLE ip_events ADD COLUMN may have failed (check manually)"
+fi
+sqlite3 "$DB_FILE" "CREATE UNIQUE INDEX IF NOT EXISTS ux_ip_events_event_hash ON ip_events(event_hash);"
+
+# ip_events_30 (table should exist if you added it to schema.sql above)
+if sqlite3 "$DB_FILE" "SELECT name FROM sqlite_master WHERE type='table' AND name='ip_events_30';" | grep -q ip_events_30; then
+  if column_exists "$DB_FILE" "ip_events_30" "event_hash"; then
+    echo "ℹ️ ip_events_30.event_hash already present"
+  else
+    echo "➕ Adding event_hash to ip_events_30"
+    sqlite3 "$DB_FILE" "ALTER TABLE ip_events_30 ADD COLUMN event_hash TEXT;" \
+      || echo "⚠️ ALTER TABLE ip_events_30 ADD COLUMN may have failed (check manually)"
+  fi
+  sqlite3 "$DB_FILE" "CREATE UNIQUE INDEX IF NOT EXISTS ux_ip_events_30_event_hash ON ip_events_30(event_hash);"
+else
+  echo "ℹ️ ip_events_30 table not found; skipping event_hash addition for ip_events_30"
+fi
+
+echo "✅ event_hash migration step complete."
+# --- end event_hash migration snippet ---
+
 # Ensure WAL mode and sane synchronous setting (idempotent)
 echo "🛠️ Configuring SQLite pragmas (WAL, synchronous=NORMAL)..."
 sqlite3 net_sentinel.db "PRAGMA journal_mode=WAL;" >/dev/null 2>&1 || true
