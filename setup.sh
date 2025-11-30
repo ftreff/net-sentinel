@@ -1,5 +1,9 @@
 #!/bin/bash
 # --force-geoip option will force download of geoip db
+# Install Python dependencies
+echo "📦 Installing Python and sqlite3 packages..."
+sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython python3-tqdm sqlite3 -y
+
 echo "🔧 Setting up Net Sentinel database..."
 
 # Parse optional flags
@@ -31,10 +35,6 @@ sqlite3 net_sentinel.db "PRAGMA synchronous=NORMAL;" >/dev/null 2>&1 || true
 # Report current journal mode for visibility
 CURRENT_JOURNAL=$(sqlite3 net_sentinel.db "PRAGMA journal_mode;")
 echo "📘 SQLite journal_mode is: ${CURRENT_JOURNAL}"
-
-# Install Python dependencies
-echo "📦 Installing Python packages..."
-sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython python3-tqdm -y
 
 # Download GeoLite2 if missing or if a newer release is available
 GEOIP_DB="data/geoip/GeoLite2-City.mmdb"
