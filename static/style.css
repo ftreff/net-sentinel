@@ -72,7 +72,7 @@ body.dark::after {
   z-index: 9999;
 }
 
-/* Marker cluster styling */
+/* Marker cluster styling (base) */
 .marker-cluster-small { background-color: rgba(0,255,204,0.4); color: #000; }
 .marker-cluster-medium { background-color: rgba(0,255,204,0.6); color: #000; }
 .marker-cluster-large { background-color: rgba(0,255,204,0.8); color: #000; }
@@ -86,6 +86,63 @@ body.dark::after {
   font-weight: bold;
 }
 .marker-cluster span { line-height: 30px; font-size: 14px; }
+
+/* Cluster variants for accepted and dropped groups */
+.marker-cluster-accepted div {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0,255,204,0.95);
+  display: inline-block;
+  text-align: center;
+  line-height: 40px;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+.marker-cluster-dropped div {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,107,107,0.95);
+  display: inline-block;
+  text-align: center;
+  line-height: 40px;
+  font-weight: 700;
+  color: #000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+/* Event dot icon (used for individual markers) */
+.event-dot-icon {
+  display: inline-block;
+  line-height: 0;
+  pointer-events: auto;
+}
+
+/* The visible dot */
+.event-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.6);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  vertical-align: middle;
+}
+
+/* Ensure divIcon contents are visible inside Leaflet marker elements */
+.leaflet-marker-icon .event-dot,
+.event-dot-icon .event-dot {
+  display: inline-block;
+}
+
+/* Slightly larger dot when marker is hovered for better affordance */
+.leaflet-marker-icon:hover .event-dot,
+.event-dot-icon:hover .event-dot {
+  transform: scale(1.25);
+  transition: transform 120ms ease;
+}
 
 /* === Stats box base === */
 #stats-box {
@@ -158,6 +215,13 @@ body.dark::after {
   box-sizing: border-box;
 }
 
+/* Loading hint inside statsBar while chunked loading runs */
+.stats-bar[data-loading="true"] {
+  font-weight: 700;
+  text-align: center;
+  padding: 12px;
+}
+
 /* Top summary row */
 .stats-summary {
   display: flex;
@@ -195,12 +259,12 @@ body.dark::after {
 
 /* Make Top Countries narrower and Top Ports wider */
 .stats-col.countries {
-  flex: 0 0 250px;   /* narrower base width for countries */
+  flex: 0 0 250px;
   max-width: 330px;
   min-width: 120px;
 }
 .stats-col.ports {
-  flex: 1 1 640px;   /* wider base width for ports */
+  flex: 1 1 640px;
   min-width: 260px;
   max-width: calc(100% - 100px);
 }
@@ -214,10 +278,9 @@ body.dark::after {
 }
 
 /* Ordered lists */
-/* Add right padding so list content has breathing room before the scrollbar */
 .stats-col ol {
   margin: 0 0 0 18px;
-  padding: 0 12px 0 0; /* right padding added */
+  padding: 0 12px 0 0;
   max-height: 36vh;
   overflow: auto;
   color: var(--ns-accent);
@@ -233,7 +296,7 @@ body.dark::after {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 6px; /* extra small padding to ensure numbers/text don't touch scrollbar */
+  padding-right: 6px;
 }
 
 /* Ports list: allow wrapping for long port descriptions */
@@ -255,7 +318,7 @@ body.dark::after {
   font-size: 12px;
 }
 
-/* DataTables compatibility helpers (if you later integrate DataTables) */
+/* DataTables compatibility helpers */
 #stats-box .statistics .dt-col-country { width: 250px !important; }
 #stats-box .statistics .dt-col-ports { width: 640px !important; }
 .dataTables_wrapper #stats-box .statistics table { table-layout: fixed !important; }
@@ -282,4 +345,3 @@ body.dark::after {
   outline: 2px solid rgba(0,255,204,0.18);
   outline-offset: 2px;
 }
-
