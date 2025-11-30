@@ -162,7 +162,7 @@ function initMap() {
 
   // Listen for external refresh requests (e.g., stats refresh button)
   window.addEventListener("net_sentinel:refresh_stats", () => {
-    loadStats();
+    refreshStatsAndMap();
   });
 }
 
@@ -186,6 +186,51 @@ function addStatsBar() {
   };
   control.addTo(map);
 }
+
+// --- ADD THIS FUNCTION TO dashboard.js ---
+
+function addZoomButton() {
+  const control = L.control({ position: "bottomright" });
+  control.onAdd = function () {
+    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+    const btn = L.DomUtil.create("a", "", div);
+    btn.innerHTML = "🔍";
+    btn.href = "#";
+    btn.title = "Zoom to fit visible markers";
+
+    L.DomEvent.on(btn, "click", function (e) {
+      L.DomEvent.preventDefault(e);
+
+      try {
+        // prefer using currently visible markers (markers array)
+        if (markers && markers.length > 0) {
+          const group = L.featureGroup(markers);
+          const bounds = group.getBounds();
+          if (bounds && bounds.isValid && bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [20, 20] });
+            return;
+          }
+        }
+
+        // fallback: try cluster bounds if clusters are present
+        const accBounds = acceptedClusters && typeof acceptedClusters.getBounds === 'function' ? acceptedClusters.getBounds() : null;
+        const dropBounds = droppedClusters && typeof droppedClusters.getBounds === 'function' ? droppedClusters.getBounds() : null;
+        const bounds = accBounds && dropBounds ? accBounds.extend(dropBounds) : (accBounds || dropBounds);
+        if (bounds && bounds.isValid && bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [20, 20] });
+        }
+      } catch (err) {
+        console.warn("Zoom-to-fit failed:", err);
+      }
+    });
+
+    return div;
+  };
+  control.addTo(map);
+}
+
+// expose globally for any inline calls
+window.addZoomButton = addZoomButton;
 
 function addTimeFilterControl() {
   const control = L.control({ position: "topright" });
@@ -729,6 +774,95 @@ function loadStats() {
     });
 }
 
+// --- add: refresh button + combined refresh handler ---
+
+/**
+ * Refresh both stats and the map using current filters.
+ * Uses the existing onFilterChange (debounced wrapper if present).
+ */
+function refreshStatsAndMap() {
+  const btn = document.getElementById('stat-refresh');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Refreshing...';
+  }
+
+  // Kick off stats and events refresh
+  try { loadStats(); } catch (e) { console.warn('loadStats failed:', e); }
+  try {
+    // Prefer the debounced wrapper if present so we don't spam the server
+    if (typeof window.onFilterChange === 'function') {
+      window.onFilterChange();
+    } else {
+      onFilterChange();
+    }
+  } catch (e) {
+    console.warn('onFilterChange failed:', e);
+  }
+
+  // Wait until chunked loading (if any) finishes, or timeout
+  const statsBar = document.getElementById('statsBar');
+  const MAX_WAIT_MS = 10000; // maximum wait before re-enabling button
+  const POLL_INTERVAL = 200;
+  const start = Date.now();
+
+  function checkDone() {
+    // If statsBar indicates loading (set by chunkProgress), keep waiting
+    const stillLoading = statsBar && statsBar.dataset && statsBar.dataset.loading === 'true';
+
+    // Also consider cluster groups: if chunkedLoading is used, chunkProgress sets statsBar.dataset.loading.
+    // If no statsBar or no dataset flag, we still wait a short grace period to let fetches start.
+    const elapsed = Date.now() - start;
+    if (!stillLoading || elapsed >= MAX_WAIT_MS) {
+      // done or timed out — re-enable button
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Refresh';
+      }
+      return;
+    }
+    // otherwise poll again
+    setTimeout(checkDone, POLL_INTERVAL);
+  }
+
+  // Start polling after a small initial delay so requests have time to begin
+  setTimeout(checkDone, 250);
+}
+
+// expose globally so inline handlers or other scripts can call it
+window.refreshStatsAndMap = refreshStatsAndMap;
+
+/**
+ * Idempotent injection of a refresh button into the stats area.
+ * If a button already exists (by id or class), this will not create another.
+ */
+if (!window._netSentinelRefreshInstalled) {
+  window._netSentinelRefreshInstalled = true;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('stats-box') || document.getElementById('statsBar');
+    if (!container) return;
+
+    // If any element with id or class 'stat-refresh' already exists, do nothing
+    if (document.getElementById('stat-refresh') || container.querySelector('.stat-refresh')) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'stat-refresh';
+    btn.className = 'stat-refresh';
+    btn.textContent = 'Refresh';
+    btn.title = 'Refresh stats and update map';
+    btn.onclick = refreshStatsAndMap;
+
+    // try to place inside a header if present, otherwise prepend
+    const header = container.querySelector('.stats-header');
+    if (header) {
+      header.appendChild(btn);
+    } else {
+      container.insertBefore(btn, container.firstChild);
+    }
+  });
+}
+
 function lookupService(port) {
   if (port == null || port === "") return "Unknown";
   const key = String(port);
@@ -749,5 +883,14 @@ window.initMap = initMap;
 window.resetFilters = resetFilters;
 window.addZoomButton = addZoomButton;
 window.onFilterChange = debounce(onFilterChange, 200);
+
+// Remove any extra refresh buttons that were injected into the compact stats area
+(function removeDuplicateStatsButtons() {
+  const statsBar = document.getElementById('statsBar') || document.getElementById('stats-box');
+  if (!statsBar) return;
+  // Remove all buttons inside the stats container except the canonical one with id="stat-refresh"
+  const extraButtons = Array.from(statsBar.querySelectorAll('button')).filter(b => b.id !== 'stat-refresh');
+  extraButtons.forEach(b => b.remove());
+})();
 
 window.onload = initMap;
