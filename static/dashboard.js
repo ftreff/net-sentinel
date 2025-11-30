@@ -56,7 +56,6 @@ function createEventMarker(event) {
       <b>Country:</b> ${ev.country || "N/A"}<br>
       <b>Region:</b> ${ev.state || "N/A"}<br>
       <b>City:</b> ${ev.city || "N/A"}<br>
-      <b>Hits:</b> ${ev.hit_count || 1}<br>
       <b>Timestamp:</b> ${ev.timestamp || 'N/A'}<br>
     `;
     this.bindPopup(popupHtml).openPopup();
