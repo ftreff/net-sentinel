@@ -1,15 +1,15 @@
 let map;
 let markers = [];
 let services = {}; // will hold services.json mapping
-let currentClusterRadius = 40; // ✅ global radius state
-let useClusters = true;          // ✅ new flag: start in clustered mode
+let currentClusterRadius = 40;
+let useClusters = true;
 
 function initMap() {
   map = L.map("map", {
     zoomSnap: 0.25,
     zoomDelta: 0.25,
     wheelPxPerZoomLevel: 60,
-    zoomControl: false // disable default zoom control
+    zoomControl: false
   }).setView([20, 0], 2);
 
   const dark = L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
@@ -23,19 +23,13 @@ function initMap() {
   const baseMaps = { Dark: dark, Light: light };
   dark.addTo(map);
 
-  // ✅ Move basemap toggle to bottom-right
   L.control.layers(baseMaps, null, { position: "bottomright" }).addTo(map);
-
-  // ✅ Add zoom control bottom-right
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
-  // ✅ These must be called in order:
   addTimeFilterControl();
-  addStatsBar();       // stats window bottom-left
-  addZoomButton();     // magnifying glass bottom-right
+  addStatsBar();       // no-op if #stats-box exists in map.html
+  addZoomButton();
   initCustomPortToggle();
-
-  // ✅ Add cluster radius slider + toggle
   addClusterRadiusControl();
 
   fetch("/data/services.json")
@@ -43,18 +37,27 @@ function initMap() {
     .then(data => {
       services = data;
       const timeSelect = document.getElementById("timeRange");
-      if (timeSelect) timeSelect.value = "24h"; // enforce default
-      onFilterChange(); // initial load using current filters
+      if (timeSelect) timeSelect.value = "24h";
+      onFilterChange();
   })
     .catch(err => {
       console.error("Failed to load services.json:", err);
       const timeSelect = document.getElementById("timeRange");
-      if (timeSelect) timeSelect.value = "24h"; // enforce default even if services fail
-      onFilterChange(); // still load with Unknown services
+      if (timeSelect) timeSelect.value = "24h";
+      onFilterChange();
     });
+
+  // Listen for external refresh requests (e.g., stats refresh button)
+  window.addEventListener("net_sentinel:refresh_stats", () => {
+    loadStats();
+  });
 }
 
 function addStatsBar() {
+  if (document.getElementById("stats-box")) {
+    return;
+  }
+
   const control = L.control({ position: "bottomleft" });
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "stats-bar");
@@ -77,7 +80,6 @@ function addTimeFilterControl() {
     div.innerHTML = `
       <button id="resetFiltersBtn" onclick="resetFilters()">Reset Filters</button>
 
-      <!-- Time filter -->
       <select id="timeRange" onchange="onFilterChange()">
         <option value="">All Time</option>
         <option value="1min">Last 1 min</option>
@@ -92,14 +94,12 @@ function addTimeFilterControl() {
         <option value="30d">Last 30 days</option>
       </select>
 
-      <!-- Verdict filter -->
       <select id="verdictFilter" onchange="onFilterChange()">
         <option value="">All Verdicts</option>
         <option value="ACCEPT">Only ACCEPT</option>
         <option value="DROP">Only DROP</option>
       </select>
 
-      <!-- Protocol filter -->
       <select id="protoFilter" onchange="onFilterChange()">
         <option value="">All Protocols</option>
         <option value="TCP">TCP</option>
@@ -107,14 +107,12 @@ function addTimeFilterControl() {
         <option value="ICMP">ICMP</option>
       </select>
 
-      <!-- Direction filter -->
       <select id="directionFilter" onchange="onFilterChange()">
         <option value="">All Directions</option>
         <option value="INBOUND">Inbound</option>
         <option value="OUTBOUND">Outbound</option>
       </select>
 
-      <!-- Service category filter -->
       <select id="serviceCategoryFilter" onchange="onFilterChange()">
         <option value="">All Services</option>
         <option value="Web">Web (80,443,8080)</option>
@@ -125,7 +123,6 @@ function addTimeFilterControl() {
         <option value="Unknown">Unknown</option>
       </select>
 
-      <!-- Frequency filter -->
       <select id="frequencyFilter" onchange="onFilterChange()">
         <option value="">All Frequencies</option>
         <option value=">1">>1</option>
@@ -138,12 +135,10 @@ function addTimeFilterControl() {
         <option value=">1000">>1000</option>
       </select>
 
-      <!-- Country filter -->
       <select id="countryFilter" onchange="onFilterChange()">
         <option value="">All Countries</option>
       </select>
 
-      <!-- Port filter -->
       <select id="portFilter" onchange="onFilterChange()">
         <option value="">All Ports</option>
         <option value="custom">Enter Port #...</option>
@@ -151,7 +146,6 @@ function addTimeFilterControl() {
       <input id="customPort" type="text" placeholder="Port #"
              style="display:none;" onblur="onFilterChange()" />
 
-      <!-- Source/Destination IP filters -->
       <input id="srcIpFilter" type="text" placeholder="Source IP" onblur="onFilterChange()" />
       <input id="dstIpFilter" type="text" placeholder="Destination IP" onblur="onFilterChange()" />
     `;
@@ -160,13 +154,12 @@ function addTimeFilterControl() {
   control.addTo(map);
 }
 
-// ✅ New cluster radius slider + toggle control
 function addClusterRadiusControl() {
   const control = L.control({ position: "topright" });
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "leaflet-bar leaflet-control leaflet-control-custom");
-    div.style.background = "black";   // ✅ black background
-    div.style.color = "white";        // ✅ white text for contrast
+    div.style.background = "black";
+    div.style.color = "white";
     div.style.padding = "5px";
 
     const label = L.DomUtil.create("div", "", div);
@@ -198,16 +191,11 @@ function addClusterRadiusControl() {
     button.style.marginTop = "5px";
     button.onclick = function () {
       useClusters = !useClusters;
-
-      // Remove existing layers
       if (window.markerCluster) {
         map.removeLayer(window.markerCluster);
       }
       markers.forEach(m => map.removeLayer(m));
-
-      // Reload events with new mode
       onFilterChange();
-
       label.innerHTML = useClusters ? 
         "Mode: Grouped (Radius " + currentClusterRadius + ")" : 
         "Mode: Individual";
@@ -236,7 +224,6 @@ function resetFilters() {
   idsToReset.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    // For selects we want to reset to default; timeRange -> 24h, others -> empty
     if (el.tagName === "SELECT") {
       if (id === "timeRange") {
         el.value = "24h";
@@ -268,7 +255,6 @@ function initCustomPortToggle() {
 }
 
 function addZoomButton() {
-  // ✅ Moved to bottom-right
   const control = L.control({ position: "bottomright" });
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
@@ -304,15 +290,13 @@ function onFilterChange() {
   const srcIpVal = document.getElementById("srcIpFilter").value;
   const dstIpVal = document.getElementById("dstIpFilter").value;
 
-  // Normalize values
   if (serviceCategoryVal) {
-    serviceCategoryVal = serviceCategoryVal.toLowerCase(); // e.g. "BitTorrent" → "bittorrent"
+    serviceCategoryVal = serviceCategoryVal.toLowerCase();
   }
   if (directionVal) {
-    directionVal = directionVal.toUpperCase(); // e.g. "Inbound" → "INBOUND"
+    directionVal = directionVal.toUpperCase();
   }
 
-  // Determine time cutoff and whether to use the 30-day archive dataset
   let since = null;
   let use30 = false;
   if (timeVal) {
@@ -333,14 +317,12 @@ function onFilterChange() {
     since = now.toISOString();
   }
 
-  // Normalize frequency (">10" -> 10)
   let frequencyThreshold = null;
   if (frequencyVal && frequencyVal.startsWith(">")) {
     const n = parseInt(frequencyVal.slice(1), 10);
     if (!isNaN(n)) frequencyThreshold = n;
   }
 
-  // Call loaders with normalized values and the use30 flag
   loadEvents(
     since,
     verdictVal,
@@ -382,21 +364,18 @@ function loadEvents(
   if (port) params.push(`port=${encodeURIComponent(port)}`);
   if (srcIp) params.push(`src_ip=${encodeURIComponent(srcIp)}`);
   if (dstIp) params.push(`dst_ip=${encodeURIComponent(dstIp)}`);
-  // If the user requested 30-day view, tell the backend to use the 30-day archive dataset
   if (use30) params.push("use_30=1");
   if (params.length) url += "?" + params.join("&");
 
   fetch(url)
     .then((res) => res.json())
     .then((data) => {
-      // Clear previous layers
       if (window.markerCluster) {
         map.removeLayer(window.markerCluster);
       }
       markers.forEach(m => map.removeLayer(m));
       markers = [];
 
-      // Create cluster group only if useClusters is true
       if (useClusters) {
         window.markerCluster = L.markerClusterGroup({
           maxClusterRadius: currentClusterRadius
@@ -446,12 +425,10 @@ function loadEvents(
         }
       });
 
-      // Add cluster group if in clustered mode
       if (useClusters && window.markerCluster) {
         map.addLayer(window.markerCluster);
       }
 
-      // Fit bounds to markers
       if (markers.length > 0) {
         const group = L.featureGroup(markers);
         map.fitBounds(group.getBounds(), { padding: [20, 20] });
@@ -466,8 +443,16 @@ function loadStats() {
   fetch("/api/stats")
     .then((res) => res.json())
     .then((stats) => {
-      const div = document.getElementById("statsBar");
+      // Elements in map.html
+      const dropEl = document.getElementById("stat-drop-count");
+      const acceptEl = document.getElementById("stat-accept-count");
+      const topCountriesEl = document.getElementById("stat-top-countries");
+      const topPortsEl = document.getElementById("stat-top-ports");
 
+      // Fallback container if explicit elements are not present
+      const statsBody = document.getElementById("statsBar") || document.getElementById("stats-body") || document.getElementById("statsBar");
+
+      // Update country and port selects while preserving selection
       const countrySelect = document.getElementById("countryFilter");
       const portSelect = document.getElementById("portFilter");
       const prevCountry = countrySelect ? countrySelect.value : "";
@@ -498,18 +483,49 @@ function loadStats() {
         portSelect.appendChild(customOpt);
         portSelect.value = prevPort || "";
       }
-      const formatPort = (p) => {
-        const svc = lookupService(Number(p.port)) || p.service || "";
-        return `&nbsp;&nbsp;${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
-      };
 
-      div.innerHTML = `
-        <b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}<br>
-        <b>Top Countries:</b><br>
-        ${stats.top_countries.map(c => `&nbsp;&nbsp;${c.country || "N/A"} (${c.count})`).join("<br>")}<br>
-        <b>Top Ports:</b><br>
-        ${stats.top_ports.map(formatPort).join("<br>")}
-      `;
+      // Populate counts
+      if (dropEl) dropEl.textContent = stats.drop_count;
+      if (acceptEl) acceptEl.textContent = stats.accept_count;
+
+      // Populate top 20 countries
+      if (topCountriesEl) {
+        topCountriesEl.innerHTML = "";
+        stats.top_countries.slice(0, 20).forEach(c => {
+          const li = document.createElement("li");
+          li.innerHTML = `${c.country || "N/A"} <span style="color: #00ffcc; float:right;">${c.count}</span>`;
+          topCountriesEl.appendChild(li);
+        });
+      }
+
+      // Populate top 20 ports
+      if (topPortsEl) {
+        topPortsEl.innerHTML = "";
+        stats.top_ports.slice(0, 20).forEach(p => {
+          const svc = lookupService(Number(p.port)) || p.service || "";
+          const li = document.createElement("li");
+          li.innerHTML = `${p.port}${svc ? " (" + svc + ")" : ""} <span style="color: #00ffcc; float:right;">${p.count}</span>`;
+          topPortsEl.appendChild(li);
+        });
+      }
+
+      // Fallback: if explicit elements are missing, render compact summary
+      if ((!dropEl || !acceptEl || !topCountriesEl || !topPortsEl) && statsBody) {
+        const formatPort = (p) => {
+          const svc = lookupService(Number(p.port)) || p.service || "";
+          return `${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
+        };
+
+        statsBody.innerHTML = `
+          <div><b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}</div>
+          <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
+          <div style="font-weight:700;">Top Countries (20)</div>
+          ${stats.top_countries.slice(0,20).map(c => `&nbsp;&nbsp;${c.country || "N/A"} (${c.count})`).join("<br>")}
+          <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
+          <div style="font-weight:700;">Top Ports (20)</div>
+          ${stats.top_ports.slice(0,20).map(formatPort).join("<br>")}
+        `;
+      }
 
       const customPortInput = document.getElementById("customPort");
       if (customPortInput && portSelect) {
@@ -524,11 +540,7 @@ function loadStats() {
 function lookupService(port) {
   if (!port) return "Unknown";
   const key = String(port);
-
-  // Exact match
   if (services[key]) return services[key];
-
-  // Range match: look for keys like "8000-8090"
   for (const rangeKey in services) {
     if (rangeKey.includes("-")) {
       const [min, max] = rangeKey.split("-").map(Number);
@@ -537,10 +549,7 @@ function lookupService(port) {
       }
     }
   }
-
   return "Unknown";
 }
 
 window.onload = initMap;
-
-      
