@@ -885,12 +885,12 @@ window.addZoomButton = addZoomButton;
 window.onFilterChange = debounce(onFilterChange, 200);
 
 // Remove any extra refresh buttons that were injected into the compact stats area
-(function removeDuplicateStatsButtons() {
-  const statsBar = document.getElementById('statsBar') || document.getElementById('stats-box');
-  if (!statsBar) return;
+//(function removeDuplicateStatsButtons() {
+ // const statsBar = document.getElementById('statsBar') || document.getElementById('stats-box');
+//  if (!statsBar) return;
   // Remove all buttons inside the stats container except the canonical one with id="stat-refresh"
-  const extraButtons = Array.from(statsBar.querySelectorAll('button')).filter(b => b.id !== 'stat-refresh');
-  extraButtons.forEach(b => b.remove());
-})();
+//  const extraButtons = Array.from(statsBar.querySelectorAll('button')).filter(b => b.id !== 'stat-refresh');
+//  extraButtons.forEach(b => b.remove());
+//})();
 
 window.onload = initMap;
