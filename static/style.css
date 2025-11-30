@@ -91,7 +91,7 @@ body.dark::after {
   border-radius: 6px;
   overflow: hidden;
   transition: height 220ms ease, opacity 180ms ease;
-  max-width: 360px;
+  max-width: 800px;
   font-family: 'Courier New', monospace;
 }
 
