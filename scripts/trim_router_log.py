@@ -1,93 +1,98 @@
 #!/usr/bin/env python3
 """
-Trim router.log to keep only lines newer than N days (default: 30).
-- Assumes each line begins with an ISO-8601 timestamp (e.g., 2025-11-25T18:00:00Z ...)
-- If a line's timestamp cannot be parsed, the line is preserved (fail-safe).
-- Writes back to the same file atomically via a temp file.
+Trim and archive router logs:
+- Create a 7-day working log at [project]/logs/router.log
+- Create a 30-day archive log at [project]/logs/last30router.log
+- Reads from the source router log (default: /var/log/router.log)
+- Robust timestamp parsing: first token or LASTTS=… fallback
 """
 
 import os
 import sys
-import tempfile
-import shutil
 from datetime import datetime, timedelta, timezone
+import re
 
-# Config (override via env vars if needed)
-LOG_FILE = os.environ.get("ROUTER_LOG", "router.log")
-DAYS_TO_KEEP = int(os.environ.get("DAYS_TO_KEEP", "30"))
+# Paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
+os.makedirs(LOGS_DIR, exist_ok=True)
 
-def parse_timestamp_prefix(line: str):
-    """
-    Extract the first token as timestamp and parse into aware UTC datetime.
-    Expected formats:
-      - 2025-11-25T18:00:00Z
-      - 2025-11-25T18:00:00+00:00
-      - 2025-11-25 18:00:00 (assumed UTC)
-    Returns None if parsing fails.
-    """
+# Config (override via env)
+SRC_LOG = os.environ.get("ROUTER_LOG_SRC", "/var/log/router.log")
+OUT_7 = os.environ.get("ROUTER_LOG_OUT_7", os.path.join(LOGS_DIR, "router.log"))
+OUT_30 = os.environ.get("ROUTER_LOG_OUT_30", os.path.join(LOGS_DIR, "last30router.log"))
+
+# Cutoffs
+CUTOFF_7 = datetime.now(timezone.utc) - timedelta(days=7)
+CUTOFF_30 = datetime.now(timezone.utc) - timedelta(days=30)
+
+def parse_ts(line: str):
+    """Try first token as ISO-8601; if missing/invalid, try LASTTS=…; else None."""
     if not line:
         return None
-    first = line.split(maxsplit=1)[0]
+    first_token = line.split(maxsplit=1)[0]
+    # Try first token
+    ts = _parse_iso_like(first_token)
+    if ts:
+        return ts
+    # Try LASTTS=
+    m = re.search(r"LASTTS=([0-9T:\-\.]+Z?)", line)
+    if m:
+        return _parse_iso_like(m.group(1))
+    return None
+
+def _parse_iso_like(s: str):
     try:
-        if first.endswith("Z"):
-            # Normalize Z to +00:00 for fromisoformat
-            ts = datetime.fromisoformat(first.replace("Z", "+00:00"))
+        if s.endswith("Z"):
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
         else:
-            ts = datetime.fromisoformat(first)
-            if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-        return ts.astimezone(timezone.utc)
+            dt = datetime.fromisoformat(s)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
     except Exception:
-        # Try a looser format
         try:
-            ts = datetime.strptime(first, "%Y-%m-%dT%H:%M:%S")
-            ts = ts.replace(tzinfo=timezone.utc)
-            return ts
+            dt = datetime.strptime(s, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+            return dt
         except Exception:
             return None
 
 def main():
-    cutoff = datetime.now(timezone.utc) - timedelta(days=DAYS_TO_KEEP)
-    if not os.path.exists(LOG_FILE):
-        print(f"[trim] {LOG_FILE} not found; nothing to trim.")
-        return
+    if not os.path.exists(SRC_LOG):
+        print(f"[trim] Source log not found: {SRC_LOG}")
+        sys.exit(1)
 
-    # Write to a temp file, then atomically replace
-    dirpath = os.path.dirname(os.path.abspath(LOG_FILE)) or "."
-    fd, tmp_path = tempfile.mkstemp(prefix="router_trim_", dir=dirpath)
-    os.close(fd)
-
-    kept = 0
-    total = 0
+    total = kept_7 = kept_30 = 0
+    lines_7, lines_30 = [], []
 
     try:
-        with open(LOG_FILE, "r", encoding="utf-8", errors="replace") as src, \
-             open(tmp_path, "w", encoding="utf-8") as dst:
+        with open(SRC_LOG, "r", encoding="utf-8", errors="replace") as src:
             for line in src:
                 total += 1
-                ts = parse_timestamp_prefix(line)
-                # Keep if timestamp is valid and recent, or if parsing failed (fail-safe)
-                if ts is None or ts >= cutoff:
-                    dst.write(line)
-                    kept += 1
+                ts = parse_ts(line)
+                # Fail-safe: if timestamp parsing fails, keep in both
+                if ts is None or ts >= CUTOFF_30:
+                    lines_30.append(line)
+                if ts is None or ts >= CUTOFF_7:
+                    lines_7.append(line)
+        kept_30 = len(lines_30)
+        kept_7 = len(lines_7)
+
+        # Write outputs
+        with open(OUT_30, "w", encoding="utf-8") as f30:
+            f30.writelines(lines_30)
+        with open(OUT_7, "w", encoding="utf-8") as f7:
+            f7.writelines(lines_7)
+
     except Exception as e:
-        # Clean up temp file if something goes wrong
-        try:
-            os.remove(tmp_path)
-        except Exception:
-            pass
-        print(f"[trim] Error trimming {LOG_FILE}: {e}", file=sys.stderr)
+        print(f"[trim] Error processing logs: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Replace original file
-    try:
-        shutil.move(tmp_path, LOG_FILE)
-    except Exception as e:
-        print(f"[trim] Failed to replace {LOG_FILE}: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    removed = total - kept
-    print(f"[trim] Completed: total={total}, kept={kept}, removed={removed}, cutoff={cutoff.isoformat()}")
+    removed_30 = total - kept_30
+    removed_7 = total - kept_7
+    print(f"[trim] src={SRC_LOG} total={total}")
+    print(f"[trim] 30d→ {OUT_30} kept={kept_30} removed={removed_30} cutoff={CUTOFF_30.isoformat()}")
+    print(f"[trim] 7d → {OUT_7}  kept={kept_7}  removed={removed_7}  cutoff={CUTOFF_7.isoformat()}")
 
 if __name__ == "__main__":
     main()
