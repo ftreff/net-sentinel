@@ -48,31 +48,36 @@ Then open http://localhost:5000 in your browser.
 ## 📁 Project Structure
 ```
 net-sentinel/
-├── dashboard.py                        # Flask backend API
-├── data
+├── dashboard.py                        # RUN THIS FOURTH! - And web app/site is functional! (Flask backend API)
+├── data                                # stored data 
 │   ├── geoip
-│   │   └── GeoLite2-City.mmdb          # GeoIP database (GeoLite2-City.mmdb)
+│   │   ├── GeoLite2-City.mmdb          # GeoIP database (GeoLite2-City.mmdb)
+│   │   └── GeoLite2-City.mmdb.meta     # GeoIP database (GeoLite2-City.mmdb) meta data to decide to update or skip download
 │   ├── services.json                   # External port→service mapping
-│   └── services_legend.txt
-├── ingest.sh                           # Runs parser scripts in /scripts
-├── logs
-│   └── parser-warnings.log
+│   └── services_legend.txt             # External port→service emoji useage key
+├── ingest.sh                           # RUN THIS THIRD! - Runs parser scripts in /scripts
+├── logs                                # generated logs
+│   ├── last30router.log                # generated log
+│   ├── parser-warnings.log             # generated log
+│   └── router.log                      # generated log
 ├── net_sentinel.db                     # SQLite database
+├── net_sentinel.db-shm
+├── net_sentinel.db-wal
 ├── README.md                           # Project overview
 ├── schema.sql                          # SQLite schema (unique constraints + indices)
-├── scripts
+├── scripts                             # parser scripts   
 │   ├── batch_parser.py                 # Existing Log parser
 │   ├── live_parser.py                  # Live Log parser
 │   ├── parser_utils.py                 # Log parser and enrichment engine (GeoIP, reverse DNS, services)
 │   ├── __pycache__
 │   │   └── parser_utils.cpython-313.pyc
-│   └── trim_router_log.py               # Trims logs to most recent 30 Days
-├── setup-log-server.sh                  # Configures rsyslog to receive logs from a router
-├── setup.sh                             # One-time setup script (deps, GeoIP, schema)
-└── static                               # Frontend files
-    ├── dashboard.js                     # Map logic (filters, stats, reverse DNS refresh)
-    ├── map.html                         # Map UI (Leaflet + dashboard.js)
-    └── style.css                        # UI theme
+│   └── trim_router_log.py             # Trims logs to most recent 7 days and stores a log of the last 30 Days
+├── setup-log-server.sh                # RUN THIS FIRST! - Configures rsyslog to receive logs from a router
+├── setup.sh                           # RUN THIS SECOND! One-time setup script (deps, GeoIP, schema)
+└── static                             # Frontend files
+    ├── dashboard.js                   # Map logic (filters, stats, reverse DNS refresh)
+    ├── map.html                       # Map UI (Leaflet + dashboard.js)
+    └── style.css                      # UI theme
 ```
 ---
 ## 🧪 Requirements
