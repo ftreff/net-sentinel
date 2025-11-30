@@ -1,75 +1,8 @@
-// dashboard.js
 let map;
 let markers = [];
 let services = {}; // will hold services.json mapping
 let currentClusterRadius = 40;
 let useClusters = true;
-
-// cluster groups for accepted and dropped markers
-let acceptedClusters = null;
-let droppedClusters = null;
-
-/* Utility: debounce to avoid rapid repeated filter calls */
-function debounce(fn, wait) {
-  let t = null;
-  return function(...args) {
-    clearTimeout(t);
-    t = setTimeout(() => fn.apply(this, args), wait);
-  };
-}
-
-/* We'll expose a debounced version of onFilterChange later */
-let debouncedOnFilterChange = null;
-
-/* Helper: create a marker (L.Marker) with a small colored dot icon and lazy popup
-   This minimizes DOM work by only creating popup content when the marker is clicked.
-*/
-function createEventMarker(event) {
-  const isDropped = String(event.verdict || '').toUpperCase() === 'DROP';
-  const color = isDropped ? '#ff6b6b' : '#00ffcc';
-
-  const dotIcon = L.divIcon({
-    className: 'event-dot-icon',
-    html: `<span class="event-dot" style="background:${color};"></span>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-    popupAnchor: [0, -8]
-  });
-
-  const marker = L.marker([event.latitude, event.longitude], { icon: dotIcon });
-
-  // attach raw event data for lazy popup generation
-  marker.eventData = event;
-
-  // lazy popup: create popup content only when clicked
-  marker.on('click', function () {
-    const ev = this.eventData || {};
-    const srcSvc = lookupService(Number(ev.src_port)) || ev.src_service || "Unknown";
-    const dstSvc = lookupService(Number(ev.dst_port)) || ev.dst_service || "Unknown";
-
-    const popupHtml = `
-      <b>Source IP:</b> ${ev.src_ip || 'N/A'}<br>
-      <b>Source Reverse DNS:</b> ${ev.src_rdns || "N/A"}<br>
-      <b>Destination IP:</b> ${ev.dst_ip || 'N/A'}<br>
-      <b>Destination Reverse DNS:</b> ${ev.dst_rdns || "N/A"}<br>
-      <b>Source Port:</b> ${ev.src_port || "N/A"} (${srcSvc})<br>
-      <b>Destination Port:</b> ${ev.dst_port || "N/A"} (${dstSvc})<br>
-      <b>Direction:</b> ${ev.direction || 'N/A'}<br>
-      <b>Protocol:</b> ${ev.proto || "N/A"}<br>
-      <b>Interfaces:</b> IN=${ev.in_if || "?"} OUT=${ev.out_if || "?"}<br>
-      <b>Verdict:</b> ${ev.verdict || 'N/A'}<br>
-      <b>Country:</b> ${ev.country || "N/A"}<br>
-      <b>Region:</b> ${ev.state || "N/A"}<br>
-      <b>City:</b> ${ev.city || "N/A"}<br>
-      <b>Hits:</b> ${ev.hit_count || 1}<br>
-      <b>Timestamp:</b> ${ev.timestamp || 'N/A'}<br>
-    `;
-    // bind and open popup (DOM created only for clicked marker)
-    this.bindPopup(popupHtml).openPopup();
-  });
-
-  return marker;
-}
 
 function initMap() {
   map = L.map("map", {
@@ -93,55 +26,6 @@ function initMap() {
   L.control.layers(baseMaps, null, { position: "bottomright" }).addTo(map);
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
-  // create separate cluster groups for accepted and dropped events (chunked loading)
-  acceptedClusters = L.markerClusterGroup({
-    spiderfyOnMaxZoom: true,
-    showCoverageOnHover: false,
-    maxClusterRadius: currentClusterRadius,
-    chunkedLoading: true,
-    chunkProgress: function(processed, total) {
-      const statsBar = document.getElementById('statsBar');
-      if (statsBar) {
-        statsBar.dataset.loading = 'true';
-        statsBar.textContent = `Loading markers: ${processed}/${total}`;
-      }
-      return false;
-    },
-    iconCreateFunction: function(cluster) {
-      return L.divIcon({
-        html: `<div><span>${cluster.getChildCount()}</span></div>`,
-        className: 'marker-cluster-accepted',
-        iconSize: L.point(40, 40)
-      });
-    }
-  });
-
-  droppedClusters = L.markerClusterGroup({
-    spiderfyOnMaxZoom: true,
-    showCoverageOnHover: false,
-    maxClusterRadius: currentClusterRadius,
-    chunkedLoading: true,
-    chunkProgress: function(processed, total) {
-      const statsBar = document.getElementById('statsBar');
-      if (statsBar) {
-        statsBar.dataset.loading = 'true';
-        statsBar.textContent = `Loading markers: ${processed}/${total}`;
-      }
-      return false;
-    },
-    iconCreateFunction: function(cluster) {
-      return L.divIcon({
-        html: `<div><span>${cluster.getChildCount()}</span></div>`,
-        className: 'marker-cluster-dropped',
-        iconSize: L.point(40, 40)
-      });
-    }
-  });
-
-  // add both groups to the map by default (they will be empty until loadEvents runs)
-  acceptedClusters.addTo(map);
-  droppedClusters.addTo(map);
-
   addTimeFilterControl();
   addStatsBar();       // no-op if #stats-box exists in map.html
   addZoomButton();
@@ -151,25 +35,15 @@ function initMap() {
   fetch("/data/services.json")
     .then(res => res.json())
     .then(data => {
-      services = data || {};
+      services = data;
       const timeSelect = document.getElementById("timeRange");
       if (timeSelect) timeSelect.value = "24h";
-      // create debounced wrapper now that onFilterChange exists
-      if (!debouncedOnFilterChange) {
-        debouncedOnFilterChange = debounce(onFilterChange, 200);
-        // keep global compatibility for inline handlers
-        window.onFilterChange = debouncedOnFilterChange;
-      }
       onFilterChange();
-    })
+  })
     .catch(err => {
       console.error("Failed to load services.json:", err);
       const timeSelect = document.getElementById("timeRange");
       if (timeSelect) timeSelect.value = "24h";
-      if (!debouncedOnFilterChange) {
-        debouncedOnFilterChange = debounce(onFilterChange, 200);
-        window.onFilterChange = debouncedOnFilterChange;
-      }
       onFilterChange();
     });
 
@@ -179,7 +53,6 @@ function initMap() {
   });
 }
 
-/* Stats bar control (keeps a compact stats area if #stats-box not present) */
 function addStatsBar() {
   if (document.getElementById("stats-box")) {
     return;
@@ -290,8 +163,8 @@ function addClusterRadiusControl() {
     div.style.padding = "5px";
 
     const label = L.DomUtil.create("div", "", div);
-    label.innerHTML = useClusters ?
-      "Mode: Grouped (Radius " + currentClusterRadius + ")" :
+    label.innerHTML = useClusters ? 
+      "Mode: Grouped (Radius " + currentClusterRadius + ")" : 
       "Mode: Individual";
 
     const input = L.DomUtil.create("input", "", div);
@@ -304,17 +177,12 @@ function addClusterRadiusControl() {
     input.oninput = function () {
       const newRadius = parseInt(this.value);
       currentClusterRadius = newRadius;
-      // update both cluster groups if they exist
-      if (acceptedClusters && useClusters) {
-        acceptedClusters.options.maxClusterRadius = newRadius;
-        if (typeof acceptedClusters.refreshClusters === 'function') acceptedClusters.refreshClusters();
+      if (window.markerCluster && useClusters) {
+        window.markerCluster.options.maxClusterRadius = newRadius;
+        window.markerCluster.refreshClusters();
       }
-      if (droppedClusters && useClusters) {
-        droppedClusters.options.maxClusterRadius = newRadius;
-        if (typeof droppedClusters.refreshClusters === 'function') droppedClusters.refreshClusters();
-      }
-      label.innerHTML = useClusters ?
-        "Mode: Grouped (Radius " + newRadius + ")" :
+      label.innerHTML = useClusters ? 
+        "Mode: Grouped (Radius " + newRadius + ")" : 
         "Mode: Individual";
     };
 
@@ -323,17 +191,13 @@ function addClusterRadiusControl() {
     button.style.marginTop = "5px";
     button.onclick = function () {
       useClusters = !useClusters;
-      // remove cluster layers if present
-      if (acceptedClusters) map.removeLayer(acceptedClusters);
-      if (droppedClusters) map.removeLayer(droppedClusters);
-      // remove any individual markers from the map
+      if (window.markerCluster) {
+        map.removeLayer(window.markerCluster);
+      }
       markers.forEach(m => map.removeLayer(m));
-      markers = [];
-      // re-run filter to re-add markers in the chosen mode
-      if (debouncedOnFilterChange) debouncedOnFilterChange();
-      else onFilterChange();
-      label.innerHTML = useClusters ?
-        "Mode: Grouped (Radius " + currentClusterRadius + ")" :
+      onFilterChange();
+      label.innerHTML = useClusters ? 
+        "Mode: Grouped (Radius " + currentClusterRadius + ")" : 
         "Mode: Individual";
     };
 
@@ -374,8 +238,7 @@ function resetFilters() {
   const customPortInput = document.getElementById("customPort");
   if (customPortInput) customPortInput.style.display = "none";
 
-  if (debouncedOnFilterChange) debouncedOnFilterChange();
-  else onFilterChange();
+  onFilterChange();
 }
 
 function initCustomPortToggle() {
@@ -387,8 +250,7 @@ function initCustomPortToggle() {
     const useCustom = portSelect.value === "custom";
     customPortInput.style.display = useCustom ? "inline-block" : "none";
     if (!useCustom) customPortInput.value = "";
-    if (debouncedOnFilterChange) debouncedOnFilterChange();
-    else onFilterChange();
+    onFilterChange();
   });
 }
 
@@ -415,28 +277,18 @@ function addZoomButton() {
 }
 
 function onFilterChange() {
-  const timeEl = document.getElementById("timeRange");
-  const timeVal = timeEl ? timeEl.value : "";
-  const verdictEl = document.getElementById("verdictFilter");
-  const verdictVal = verdictEl ? verdictEl.value : "";
-  const protoEl = document.getElementById("protoFilter");
-  const protoVal = protoEl ? protoEl.value : "";
-  const directionEl = document.getElementById("directionFilter");
-  let directionVal = directionEl ? directionEl.value : "";
-  const serviceCategoryEl = document.getElementById("serviceCategoryFilter");
-  let serviceCategoryVal = serviceCategoryEl ? serviceCategoryEl.value : "";
-  const frequencyEl = document.getElementById("frequencyFilter");
-  const frequencyVal = frequencyEl ? frequencyEl.value : "";
-  const countryEl = document.getElementById("countryFilter");
-  const countryVal = countryEl ? countryEl.value : "";
-  const portEl = document.getElementById("portFilter");
-  const portVal = portEl ? portEl.value : "";
+  const timeVal = document.getElementById("timeRange").value;
+  const verdictVal = document.getElementById("verdictFilter").value;
+  const protoVal = document.getElementById("protoFilter").value;
+  let directionVal = document.getElementById("directionFilter").value;
+  let serviceCategoryVal = document.getElementById("serviceCategoryFilter").value;
+  const frequencyVal = document.getElementById("frequencyFilter").value;
+  const countryVal = document.getElementById("countryFilter").value;
+  const portVal = document.getElementById("portFilter").value;
   const customPortInput = document.getElementById("customPort");
-  const portFinal = portVal === "custom" && customPortInput ? customPortInput.value : portVal;
-  const srcIpEl = document.getElementById("srcIpFilter");
-  const srcIpVal = srcIpEl ? srcIpEl.value : "";
-  const dstIpEl = document.getElementById("dstIpFilter");
-  const dstIpVal = dstIpEl ? dstIpEl.value : "";
+  const portFinal = portVal === "custom" ? customPortInput.value : portVal;
+  const srcIpVal = document.getElementById("srcIpFilter").value;
+  const dstIpVal = document.getElementById("dstIpFilter").value;
 
   if (serviceCategoryVal) {
     serviceCategoryVal = serviceCategoryVal.toLowerCase();
@@ -516,109 +368,70 @@ function loadEvents(
   if (params.length) url += "?" + params.join("&");
 
   fetch(url)
-    .then((res) => {
-      if (!res.ok) throw new Error(`Events API returned ${res.status}`);
-      return res.json();
-    })
+    .then((res) => res.json())
     .then((data) => {
-      // defensive: ensure data is an array
-      if (!Array.isArray(data)) data = Array.isArray(data.events) ? data.events : [];
-
-      // clear previous clusters and markers
-      try {
-        if (acceptedClusters) acceptedClusters.clearLayers();
-        if (droppedClusters) droppedClusters.clearLayers();
-      } catch (e) {
-        console.warn("Error clearing clusters:", e);
+      if (window.markerCluster) {
+        map.removeLayer(window.markerCluster);
       }
-
-      // remove any markers previously added directly to the map
-      markers.forEach(m => {
-        try { map.removeLayer(m); } catch (e) {}
-      });
+      markers.forEach(m => map.removeLayer(m));
       markers = [];
 
-      // Collect markers into arrays and add in bulk for performance
-      const acceptedToAdd = [];
-      const droppedToAdd = [];
+      if (useClusters) {
+        window.markerCluster = L.markerClusterGroup({
+          maxClusterRadius: currentClusterRadius
+        });
+      }
 
-      for (let i = 0; i < data.length; i++) {
-        const event = data[i];
-        if (!event || !event.latitude || !event.longitude) continue;
+      data.forEach((event) => {
+        if (!event.latitude || !event.longitude) return;
 
-        // normalize verdict once
-        const verdictNorm = String(event.verdict || '').toUpperCase();
+        const marker = L.circleMarker([event.latitude, event.longitude], {
+          radius: 6,
+          fillColor: event.verdict === "DROP" ? "red" : "lime",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8,
+        });
 
-        // create marker using helper (L.Marker with divIcon)
-        let marker;
-        try {
-          marker = createEventMarker(event);
-        } catch (e) {
-          console.warn("Failed to create marker for event:", e, event);
-          continue;
-        }
+        const srcSvc = lookupService(Number(event.src_port)) || event.src_service || "Unknown";
+        const dstSvc = lookupService(Number(event.dst_port)) || event.dst_service || "Unknown";
 
-        // keep markers array for zoom-to-fit and individual mode
+        const popup = `
+          <b>Source IP:</b> ${event.src_ip}<br>
+          <b>Source Reverse DNS:</b> ${event.src_rdns || "N/A"}<br>
+          <b>Destination IP:</b> ${event.dst_ip}<br>
+          <b>Destination Reverse DNS:</b> ${event.dst_rdns || "N/A"}<br>
+          <b>Source Port:</b> ${event.src_port || "N/A"} (${srcSvc})<br>
+          <b>Destination Port:</b> ${event.dst_port || "N/A"} (${dstSvc})<br>
+          <b>Direction:</b> ${event.direction}<br>
+          <b>Protocol:</b> ${event.proto || "N/A"}<br>
+          <b>Interfaces:</b> IN=${event.in_if || "?"} OUT=${event.out_if || "?"}<br>
+          <b>Verdict:</b> ${event.verdict}<br>
+          <b>Country:</b> ${event.country || "N/A"}<br>
+          <b>Region:</b> ${event.state || "N/A"}<br>
+          <b>City:</b> ${event.city || "N/A"}<br>
+          <b>Hits:</b> ${event.hit_count || 1}<br>
+          <b>Timestamp:</b> ${event.timestamp}<br>
+        `;
+
+        marker.bindPopup(popup);
         markers.push(marker);
 
         if (useClusters) {
-          if (verdictNorm === 'DROP') {
-            droppedToAdd.push(marker);
-          } else {
-            acceptedToAdd.push(marker);
-          }
+          window.markerCluster.addLayer(marker);
         } else {
-          // individual mode: add marker directly to map
-          try { marker.addTo(map); } catch (e) { console.warn("Failed to add marker to map:", e); }
+          map.addLayer(marker);
         }
+      });
+
+      if (useClusters && window.markerCluster) {
+        map.addLayer(window.markerCluster);
       }
 
-      // Bulk-add to clusters (faster than adding one-by-one)
-      if (useClusters) {
-        try {
-          if (acceptedToAdd.length && acceptedClusters) acceptedClusters.addLayers(acceptedToAdd);
-          if (droppedToAdd.length && droppedClusters) droppedClusters.addLayers(droppedToAdd);
-        } catch (e) {
-          // fallback: try adding individually if addLayers not available
-          console.warn("Bulk add to clusters failed, falling back to per-marker add:", e);
-          try {
-            acceptedToAdd.forEach(m => acceptedClusters.addLayer(m));
-            droppedToAdd.forEach(m => droppedClusters.addLayer(m));
-          } catch (err) {
-            console.error("Fallback cluster add also failed:", err);
-          }
-        }
-      }
-
-      // ensure cluster groups are on the map when grouped mode is active
-      if (useClusters) {
-        if (acceptedClusters && !map.hasLayer(acceptedClusters)) acceptedClusters.addTo(map);
-        if (droppedClusters && !map.hasLayer(droppedClusters)) droppedClusters.addTo(map);
-      }
-
-      // clear any temporary loading message and refresh stats
-      const statsBar = document.getElementById('statsBar');
-      if (statsBar && statsBar.dataset.loading) {
-        delete statsBar.dataset.loading;
-        loadStats();
-      }
-
-      // Fit bounds only when marker count is reasonable to avoid long blocking operations
-      try {
-        const MAX_FIT_MARKERS = 1500; // tune this threshold
-        if (markers.length > 0 && markers.length <= MAX_FIT_MARKERS) {
-          const group = L.featureGroup(markers);
-          map.fitBounds(group.getBounds(), { padding: [20, 20] });
-        } else if (useClusters) {
-          const accBounds = acceptedClusters && acceptedClusters.getBounds && acceptedClusters.getBounds();
-          const dropBounds = droppedClusters && droppedClusters.getBounds && droppedClusters.getBounds();
-          const bounds = accBounds && dropBounds ? accBounds.extend(dropBounds) : (accBounds || dropBounds);
-          if (bounds && bounds.isValid && bounds.isValid()) {
-            map.fitBounds(bounds, { padding: [20, 20] });
-          }
-        }
-      } catch (e) {
-        console.warn("fitBounds skipped due to error or size:", e);
+      if (markers.length > 0) {
+        const group = L.featureGroup(markers);
+        map.fitBounds(group.getBounds(), { padding: [20, 20] });
       }
     })
     .catch((err) => {
@@ -628,18 +441,8 @@ function loadEvents(
 
 function loadStats() {
   fetch("/api/stats")
-    .then((res) => {
-      if (!res.ok) throw new Error(`Stats API returned ${res.status}`);
-      return res.json();
-    })
+    .then((res) => res.json())
     .then((stats) => {
-      // defensive defaults
-      if (!stats || typeof stats !== 'object') stats = {};
-      stats.top_countries = Array.isArray(stats.top_countries) ? stats.top_countries : [];
-      stats.top_ports = Array.isArray(stats.top_ports) ? stats.top_ports : [];
-      stats.drop_count = typeof stats.drop_count === 'number' ? stats.drop_count : (Number(stats.drop_count) || 0);
-      stats.accept_count = typeof stats.accept_count === 'number' ? stats.accept_count : (Number(stats.accept_count) || 0);
-
       // Elements in map.html
       const dropEl = document.getElementById("stat-drop-count");
       const acceptEl = document.getElementById("stat-accept-count");
@@ -655,48 +458,29 @@ function loadStats() {
       const prevCountry = countrySelect ? countrySelect.value : "";
       const prevPort = portSelect ? portSelect.value : "";
 
-      // Build country select options using DocumentFragment to minimize reflow
       if (countrySelect) {
-        const frag = document.createDocumentFragment();
-        const defaultOpt = document.createElement("option");
-        defaultOpt.value = "";
-        defaultOpt.textContent = "All Countries";
-        frag.appendChild(defaultOpt);
-
-        stats.top_countries.slice(0, 25).forEach(c => {
+        countrySelect.innerHTML = '<option value="">All Countries</option>';
+        stats.top_countries.slice(0, 20).forEach(c => {
           const opt = document.createElement("option");
-          opt.value = c && c.country ? c.country : "";
-          opt.textContent = c && c.country ? c.country : "N/A";
-          frag.appendChild(opt);
+          opt.value = c.country;
+          opt.textContent = c.country;
+          countrySelect.appendChild(opt);
         });
-
-        countrySelect.innerHTML = "";
-        countrySelect.appendChild(frag);
         countrySelect.value = prevCountry || "";
       }
 
-      // Build port select options using DocumentFragment
       if (portSelect) {
-        const frag = document.createDocumentFragment();
-        const defaultOpt = document.createElement("option");
-        defaultOpt.value = "";
-        defaultOpt.textContent = "All Ports";
-        frag.appendChild(defaultOpt);
-
-        stats.top_ports.slice(0, 25).forEach(p => {
+        portSelect.innerHTML = '<option value="">All Ports</option>';
+        stats.top_ports.slice(0, 20).forEach(p => {
           const opt = document.createElement("option");
-          opt.value = p && p.port != null ? String(p.port) : "";
-          opt.textContent = p && p.port != null ? String(p.port) : "N/A";
-          frag.appendChild(opt);
+          opt.value = String(p.port);
+          opt.textContent = String(p.port);
+          portSelect.appendChild(opt);
         });
-
         const customOpt = document.createElement("option");
         customOpt.value = "custom";
         customOpt.textContent = "Enter Port #...";
-        frag.appendChild(customOpt);
-
-        portSelect.innerHTML = "";
-        portSelect.appendChild(frag);
+        portSelect.appendChild(customOpt);
         portSelect.value = prevPort || "";
       }
 
@@ -704,50 +488,45 @@ function loadStats() {
       if (dropEl) dropEl.textContent = stats.drop_count;
       if (acceptEl) acceptEl.textContent = stats.accept_count;
 
-      // Populate top countries list using fragment
+      // Populate top 20 countries
       if (topCountriesEl) {
-        const frag = document.createDocumentFragment();
-        stats.top_countries.slice(0, 25).forEach(c => {
-          const li = document.createElement("li");
-          li.innerHTML = `${c && c.country ? c.country : "N/A"} <span style="color: #00ffcc; float:right;">${c && c.count ? c.count : 0}</span>`;
-          frag.appendChild(li);
-        });
         topCountriesEl.innerHTML = "";
-        topCountriesEl.appendChild(frag);
-      }
-
-      // Populate top ports list using fragment
-      if (topPortsEl) {
-        const frag = document.createDocumentFragment();
-        stats.top_ports.slice(0, 25).forEach(p => {
-          const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
+        stats.top_countries.slice(0, 20).forEach(c => {
           const li = document.createElement("li");
-          li.innerHTML = `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} <span style="color: #00ffcc; float:right;">${p && p.count ? p.count : 0}</span>`;
-          frag.appendChild(li);
+          li.innerHTML = `${c.country || "N/A"} <span style="color: #00ffcc; float:right;">${c.count}</span>`;
+          topCountriesEl.appendChild(li);
         });
-        topPortsEl.innerHTML = "";
-        topPortsEl.appendChild(frag);
       }
 
-      // Fallback compact summary if explicit elements are missing
+      // Populate top 20 ports
+      if (topPortsEl) {
+        topPortsEl.innerHTML = "";
+        stats.top_ports.slice(0, 20).forEach(p => {
+          const svc = lookupService(Number(p.port)) || p.service || "";
+          const li = document.createElement("li");
+          li.innerHTML = `${p.port}${svc ? " (" + svc + ")" : ""} <span style="color: #00ffcc; float:right;">${p.count}</span>`;
+          topPortsEl.appendChild(li);
+        });
+      }
+
+      // Fallback: if explicit elements are missing, render compact summary
       if ((!dropEl || !acceptEl || !topCountriesEl || !topPortsEl) && statsBody) {
         const formatPort = (p) => {
-          const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
-          return `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} (${p && p.count ? p.count : 0})`;
+          const svc = lookupService(Number(p.port)) || p.service || "";
+          return `${p.port}${svc ? " (" + svc + ")" : ""} (${p.count})`;
         };
 
         statsBody.innerHTML = `
           <div><b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}</div>
           <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Countries (25)</div>
-          ${stats.top_countries.slice(0,25).map(c => `&nbsp;&nbsp;${c && c.country ? c.country : "N/A"} (${c && c.count ? c.count : 0})`).join("<br>")}
+          <div style="font-weight:700;">Top Countries (20)</div>
+          ${stats.top_countries.slice(0,20).map(c => `&nbsp;&nbsp;${c.country || "N/A"} (${c.count})`).join("<br>")}
           <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Ports (25)</div>
-          ${stats.top_ports.slice(0,25).map(formatPort).join("<br>")}
+          <div style="font-weight:700;">Top Ports (20)</div>
+          ${stats.top_ports.slice(0,20).map(formatPort).join("<br>")}
         `;
       }
 
-      // Ensure custom port input visibility matches port select
       const customPortInput = document.getElementById("customPort");
       if (customPortInput && portSelect) {
         customPortInput.style.display = portSelect.value === "custom" ? "inline-block" : "none";
@@ -759,9 +538,9 @@ function loadStats() {
 }
 
 function lookupService(port) {
-  if (port == null || port === "") return "Unknown";
+  if (!port) return "Unknown";
   const key = String(port);
-  if (services && services[key]) return services[key];
+  if (services[key]) return services[key];
   for (const rangeKey in services) {
     if (rangeKey.includes("-")) {
       const [min, max] = rangeKey.split("-").map(Number);
@@ -773,16 +552,4 @@ function lookupService(port) {
   return "Unknown";
 }
 
-// expose functions to global scope for inline handlers (keeps existing HTML working)
-window.initMap = initMap;
-window.resetFilters = resetFilters;
-window.addZoomButton = addZoomButton;
-// ensure onFilterChange points to debounced wrapper if available
-if (!debouncedOnFilterChange) {
-  debouncedOnFilterChange = debounce(onFilterChange, 200);
-}
-window.onFilterChange = debouncedOnFilterChange;
-
-// start
 window.onload = initMap;
-
