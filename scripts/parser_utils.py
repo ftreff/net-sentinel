@@ -4,7 +4,7 @@ Parser utilities for Net Sentinel.
 Shared functions for parsing router.log lines, enriching events, and inserting into net_sentinel.db.
 """
 
-import os, re, sqlite3, socket, datetime, logging, json
+import os, re, sqlite3, socket, datetime, logging, json, time
 import geoip2.database
 
 # Paths relative to project root
@@ -95,7 +95,6 @@ def guess_service(port):
             except: continue
         elif str(port)==key: return name
     return DEFAULT_SERVICES.get(port,"Unknown")
-
 def geoip_lookup(ip):
     if ip in geoip_cache: return geoip_cache[ip]
     if GEOIP_READER is None: return {}
@@ -118,33 +117,61 @@ def enrich_event(event):
     event.update(info)
     return event
 
-def insert_events(events):
+def _with_retry(fn, retries=5, backoff=0.5):
+    """
+    Helper to retry a DB operation on transient 'database is locked' errors.
+    """
+    for attempt in range(retries):
+        try:
+            return fn()
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e).lower():
+                if attempt < retries - 1:
+                    sleep_time = backoff * (attempt + 1)
+                    logging.warning(f"DB locked, retrying in {sleep_time:.1f}s (attempt {attempt+1}/{retries})")
+                    time.sleep(sleep_time)
+                    continue
+            raise
+
+def insert_events(events, table="ip_events", chunk_size=500):
+    """
+    Insert a list of event dicts into the DB table.
+    Uses a dedicated connection with timeout and batched transactions.
+    """
     if not events:
         return
-    conn = sqlite3.connect(DB_PATH)
-    try:
-        # WAL mode should be set once at DB init, not every insert
-        c = conn.cursor()
-        c.executemany("""
-            INSERT INTO ip_events (
-                src_ip,src_rdns,src_port,src_service,
-                dst_ip,dst_rdns,dst_port,dst_service,
-                proto,in_if,out_if,
-                verdict,direction,
-                timestamp,hit_count,
-                city,state,country,country_code,latitude,longitude
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(src_ip,dst_ip,src_port,dst_port,proto,verdict,direction)
-            DO NOTHING
-        """, [(
-            e.get("src_ip"), e.get("src_rdns"), e.get("src_port"), e.get("src_service"),
-            e.get("dst_ip"), e.get("dst_rdns"), e.get("dst_port"), e.get("dst_service"),
-            e.get("proto"), e.get("in_if"), e.get("out_if"),
-            e.get("verdict"), e.get("direction"),
-            e.get("timestamp"), e.get("hit_count"),
-            e.get("city"), e.get("state"), e.get("country"), e.get("country_code"),
-            e.get("latitude"), e.get("longitude")
-        ) for e in events])
-        conn.commit()
-    finally:
-        conn.close()
+
+    def _do_insert_batch(batch):
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        try:
+            with conn:
+                cur = conn.cursor()
+                sql = f"""
+                    INSERT INTO {table} (
+                        src_ip,src_rdns,src_port,src_service,
+                        dst_ip,dst_rdns,dst_port,dst_service,
+                        proto,in_if,out_if,
+                        verdict,direction,
+                        timestamp,hit_count,
+                        city,state,country,country_code,latitude,longitude
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ON CONFLICT(src_ip,dst_ip,src_port,dst_port,proto,verdict,direction)
+                    DO NOTHING
+                """
+                rows = [(
+                    e.get("src_ip"), e.get("src_rdns"), e.get("src_port"), e.get("src_service"),
+                    e.get("dst_ip"), e.get("dst_rdns"), e.get("dst_port"), e.get("dst_service"),
+                    e.get("proto"), e.get("in_if"), e.get("out_if"),
+                    e.get("verdict"), e.get("direction"),
+                    e.get("timestamp"), e.get("hit_count"),
+                    e.get("city"), e.get("state"), e.get("country"), e.get("country_code"),
+                    e.get("latitude"), e.get("longitude")
+                ) for e in batch]
+                cur.executemany(sql, rows)
+        finally:
+            conn.close()
+
+    # Break into chunks to avoid huge transactions
+    for i in range(0, len(events), chunk_size):
+        batch = events[i:i+chunk_size]
+        _with_retry(lambda: _do_insert_batch(batch))
