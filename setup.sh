@@ -34,7 +34,7 @@ echo "📘 SQLite journal_mode is: ${CURRENT_JOURNAL}"
 
 # Install Python dependencies
 echo "📦 Installing Python packages..."
-sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython -y
+sudo apt install python3-pip python3-flask python3-requests python3-geoip2 python3-dnspython python3-tqdm -y
 
 # Download GeoLite2 if missing or if a newer release is available
 GEOIP_DB="data/geoip/GeoLite2-City.mmdb"
