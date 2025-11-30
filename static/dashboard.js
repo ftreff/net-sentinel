@@ -21,7 +21,7 @@ function debounce(fn, wait) {
 /* Lazy popup marker factory: minimal DOM until clicked */
 function createEventMarker(event) {
   const isDropped = String(event.verdict || '').toUpperCase() === 'DROP';
-  const color = isDropped ? '#ff6b6b' : '#00ffcc';
+  const color = isDropped ? '#ff0000' : '#00ff00';
 
   const dotIcon = L.divIcon({
     className: 'event-dot-icon',
