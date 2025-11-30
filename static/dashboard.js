@@ -1,6 +1,6 @@
 // dashboard.js
 let map;
-let markers = [];
+let markers = []; // array of L.Marker objects (for zoom-to-fit and individual mode)
 let services = {}; // will hold services.json mapping
 let currentClusterRadius = 40;
 let useClusters = true;
@@ -9,7 +9,7 @@ let useClusters = true;
 let acceptedClusters = null;
 let droppedClusters = null;
 
-/* Utility: debounce to avoid rapid repeated filter calls */
+/* Simple debounce helper */
 function debounce(fn, wait) {
   let t = null;
   return function(...args) {
@@ -18,12 +18,7 @@ function debounce(fn, wait) {
   };
 }
 
-/* We'll expose a debounced version of onFilterChange later */
-let debouncedOnFilterChange = null;
-
-/* Helper: create a marker (L.Marker) with a small colored dot icon and lazy popup
-   This minimizes DOM work by only creating popup content when the marker is clicked.
-*/
+/* Lazy popup marker factory: minimal DOM until clicked */
 function createEventMarker(event) {
   const isDropped = String(event.verdict || '').toUpperCase() === 'DROP';
   const color = isDropped ? '#ff6b6b' : '#00ffcc';
@@ -64,7 +59,6 @@ function createEventMarker(event) {
       <b>Hits:</b> ${ev.hit_count || 1}<br>
       <b>Timestamp:</b> ${ev.timestamp || 'N/A'}<br>
     `;
-    // bind and open popup (DOM created only for clicked marker)
     this.bindPopup(popupHtml).openPopup();
   });
 
@@ -154,22 +148,15 @@ function initMap() {
       services = data || {};
       const timeSelect = document.getElementById("timeRange");
       if (timeSelect) timeSelect.value = "24h";
-      // create debounced wrapper now that onFilterChange exists
-      if (!debouncedOnFilterChange) {
-        debouncedOnFilterChange = debounce(onFilterChange, 200);
-        // keep global compatibility for inline handlers
-        window.onFilterChange = debouncedOnFilterChange;
-      }
+      // expose debounced filter handler
+      window.onFilterChange = debounce(onFilterChange, 200);
       onFilterChange();
     })
     .catch(err => {
       console.error("Failed to load services.json:", err);
       const timeSelect = document.getElementById("timeRange");
       if (timeSelect) timeSelect.value = "24h";
-      if (!debouncedOnFilterChange) {
-        debouncedOnFilterChange = debounce(onFilterChange, 200);
-        window.onFilterChange = debouncedOnFilterChange;
-      }
+      window.onFilterChange = debounce(onFilterChange, 200);
       onFilterChange();
     });
 
@@ -179,7 +166,7 @@ function initMap() {
   });
 }
 
-/* Stats bar control (keeps a compact stats area if #stats-box not present) */
+/* Stats bar control (compact fallback) */
 function addStatsBar() {
   if (document.getElementById("stats-box")) {
     return;
@@ -305,11 +292,11 @@ function addClusterRadiusControl() {
       const newRadius = parseInt(this.value);
       currentClusterRadius = newRadius;
       // update both cluster groups if they exist
-      if (acceptedClusters && useClusters) {
+      if (acceptedClusters) {
         acceptedClusters.options.maxClusterRadius = newRadius;
         if (typeof acceptedClusters.refreshClusters === 'function') acceptedClusters.refreshClusters();
       }
-      if (droppedClusters && useClusters) {
+      if (droppedClusters) {
         droppedClusters.options.maxClusterRadius = newRadius;
         if (typeof droppedClusters.refreshClusters === 'function') droppedClusters.refreshClusters();
       }
@@ -323,15 +310,22 @@ function addClusterRadiusControl() {
     button.style.marginTop = "5px";
     button.onclick = function () {
       useClusters = !useClusters;
+
       // remove cluster layers if present
-      if (acceptedClusters) map.removeLayer(acceptedClusters);
-      if (droppedClusters) map.removeLayer(droppedClusters);
+      try {
+        if (acceptedClusters && map.hasLayer(acceptedClusters)) map.removeLayer(acceptedClusters);
+        if (droppedClusters && map.hasLayer(droppedClusters)) map.removeLayer(droppedClusters);
+      } catch (e) {
+        console.warn("Error removing cluster layers:", e);
+      }
+
       // remove any individual markers from the map
-      markers.forEach(m => map.removeLayer(m));
-      markers = [];
+      markers.forEach(m => {
+        try { map.removeLayer(m); } catch (e) {}
+      });
+
       // re-run filter to re-add markers in the chosen mode
-      if (debouncedOnFilterChange) debouncedOnFilterChange();
-      else onFilterChange();
+      if (window.onFilterChange) window.onFilterChange();
       label.innerHTML = useClusters ?
         "Mode: Grouped (Radius " + currentClusterRadius + ")" :
         "Mode: Individual";
@@ -374,7 +368,7 @@ function resetFilters() {
   const customPortInput = document.getElementById("customPort");
   if (customPortInput) customPortInput.style.display = "none";
 
-  if (debouncedOnFilterChange) debouncedOnFilterChange();
+  if (window.onFilterChange) window.onFilterChange();
   else onFilterChange();
 }
 
@@ -387,31 +381,9 @@ function initCustomPortToggle() {
     const useCustom = portSelect.value === "custom";
     customPortInput.style.display = useCustom ? "inline-block" : "none";
     if (!useCustom) customPortInput.value = "";
-    if (debouncedOnFilterChange) debouncedOnFilterChange();
+    if (window.onFilterChange) window.onFilterChange();
     else onFilterChange();
   });
-}
-
-function addZoomButton() {
-  const control = L.control({ position: "bottomright" });
-  control.onAdd = function () {
-    const div = L.DomUtil.create("div", "leaflet-bar leaflet-control");
-    const btn = L.DomUtil.create("a", "", div);
-    btn.innerHTML = "🔍";
-    btn.href = "#";
-    btn.title = "Zoom to fit all markers";
-
-    L.DomEvent.on(btn, "click", function (e) {
-      L.DomEvent.preventDefault(e);
-      if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds(), { padding: [20, 20] });
-      }
-    });
-
-    return div;
-  };
-  control.addTo(map);
 }
 
 function onFilterChange() {
@@ -524,6 +496,14 @@ function loadEvents(
       // defensive: ensure data is an array
       if (!Array.isArray(data)) data = Array.isArray(data.events) ? data.events : [];
 
+      // remove cluster layers from map first to avoid stale visuals
+      try {
+        if (acceptedClusters && map.hasLayer(acceptedClusters)) map.removeLayer(acceptedClusters);
+        if (droppedClusters && map.hasLayer(droppedClusters)) map.removeLayer(droppedClusters);
+      } catch (e) {
+        console.warn("Error removing cluster layers:", e);
+      }
+
       // clear previous clusters and markers
       try {
         if (acceptedClusters) acceptedClusters.clearLayers();
@@ -532,7 +512,6 @@ function loadEvents(
         console.warn("Error clearing clusters:", e);
       }
 
-      // remove any markers previously added directly to the map
       markers.forEach(m => {
         try { map.removeLayer(m); } catch (e) {}
       });
@@ -576,10 +555,15 @@ function loadEvents(
       // Bulk-add to clusters (faster than adding one-by-one)
       if (useClusters) {
         try {
-          if (acceptedToAdd.length && acceptedClusters) acceptedClusters.addLayers(acceptedToAdd);
-          if (droppedToAdd.length && droppedClusters) droppedClusters.addLayers(droppedToAdd);
+          if (acceptedToAdd.length && acceptedClusters) {
+            if (typeof acceptedClusters.addLayers === 'function') acceptedClusters.addLayers(acceptedToAdd);
+            else acceptedToAdd.forEach(m => acceptedClusters.addLayer(m));
+          }
+          if (droppedToAdd.length && droppedClusters) {
+            if (typeof droppedClusters.addLayers === 'function') droppedClusters.addLayers(droppedToAdd);
+            else droppedToAdd.forEach(m => droppedClusters.addLayer(m));
+          }
         } catch (e) {
-          // fallback: try adding individually if addLayers not available
           console.warn("Bulk add to clusters failed, falling back to per-marker add:", e);
           try {
             acceptedToAdd.forEach(m => acceptedClusters.addLayer(m));
@@ -592,8 +576,12 @@ function loadEvents(
 
       // ensure cluster groups are on the map when grouped mode is active
       if (useClusters) {
-        if (acceptedClusters && !map.hasLayer(acceptedClusters)) acceptedClusters.addTo(map);
-        if (droppedClusters && !map.hasLayer(droppedClusters)) droppedClusters.addTo(map);
+        try {
+          if (acceptedClusters && !map.hasLayer(acceptedClusters)) acceptedClusters.addTo(map);
+          if (droppedClusters && !map.hasLayer(droppedClusters)) droppedClusters.addTo(map);
+        } catch (e) {
+          console.warn("Error adding cluster layers to map:", e);
+        }
       }
 
       // clear any temporary loading message and refresh stats
@@ -626,6 +614,7 @@ function loadEvents(
     });
 }
 
+/* loadStats unchanged from previous robust implementation (keeps top 25) */
 function loadStats() {
   fetch("/api/stats")
     .then((res) => {
@@ -633,78 +622,64 @@ function loadStats() {
       return res.json();
     })
     .then((stats) => {
-      // defensive defaults
       if (!stats || typeof stats !== 'object') stats = {};
       stats.top_countries = Array.isArray(stats.top_countries) ? stats.top_countries : [];
       stats.top_ports = Array.isArray(stats.top_ports) ? stats.top_ports : [];
       stats.drop_count = typeof stats.drop_count === 'number' ? stats.drop_count : (Number(stats.drop_count) || 0);
       stats.accept_count = typeof stats.accept_count === 'number' ? stats.accept_count : (Number(stats.accept_count) || 0);
 
-      // Elements in map.html
       const dropEl = document.getElementById("stat-drop-count");
       const acceptEl = document.getElementById("stat-accept-count");
       const topCountriesEl = document.getElementById("stat-top-countries");
       const topPortsEl = document.getElementById("stat-top-ports");
-
-      // Fallback container if explicit elements are not present
       const statsBody = document.getElementById("statsBar") || document.getElementById("stats-body") || document.getElementById("statsBar");
 
-      // Update country and port selects while preserving selection
       const countrySelect = document.getElementById("countryFilter");
       const portSelect = document.getElementById("portFilter");
       const prevCountry = countrySelect ? countrySelect.value : "";
       const prevPort = portSelect ? portSelect.value : "";
 
-      // Build country select options using DocumentFragment to minimize reflow
       if (countrySelect) {
         const frag = document.createDocumentFragment();
         const defaultOpt = document.createElement("option");
         defaultOpt.value = "";
         defaultOpt.textContent = "All Countries";
         frag.appendChild(defaultOpt);
-
         stats.top_countries.slice(0, 25).forEach(c => {
           const opt = document.createElement("option");
           opt.value = c && c.country ? c.country : "";
           opt.textContent = c && c.country ? c.country : "N/A";
           frag.appendChild(opt);
         });
-
         countrySelect.innerHTML = "";
         countrySelect.appendChild(frag);
         countrySelect.value = prevCountry || "";
       }
 
-      // Build port select options using DocumentFragment
       if (portSelect) {
         const frag = document.createDocumentFragment();
         const defaultOpt = document.createElement("option");
         defaultOpt.value = "";
         defaultOpt.textContent = "All Ports";
         frag.appendChild(defaultOpt);
-
         stats.top_ports.slice(0, 25).forEach(p => {
           const opt = document.createElement("option");
           opt.value = p && p.port != null ? String(p.port) : "";
           opt.textContent = p && p.port != null ? String(p.port) : "N/A";
           frag.appendChild(opt);
         });
-
         const customOpt = document.createElement("option");
         customOpt.value = "custom";
         customOpt.textContent = "Enter Port #...";
         frag.appendChild(customOpt);
-
         portSelect.innerHTML = "";
         portSelect.appendChild(frag);
         portSelect.value = prevPort || "";
       }
 
-      // Populate counts
       if (dropEl) dropEl.textContent = stats.drop_count;
       if (acceptEl) acceptEl.textContent = stats.accept_count;
 
-      // Populate top countries list using fragment
       if (topCountriesEl) {
         const frag = document.createDocumentFragment();
         stats.top_countries.slice(0, 25).forEach(c => {
@@ -716,7 +691,6 @@ function loadStats() {
         topCountriesEl.appendChild(frag);
       }
 
-      // Populate top ports list using fragment
       if (topPortsEl) {
         const frag = document.createDocumentFragment();
         stats.top_ports.slice(0, 25).forEach(p => {
@@ -729,13 +703,11 @@ function loadStats() {
         topPortsEl.appendChild(frag);
       }
 
-      // Fallback compact summary if explicit elements are missing
       if ((!dropEl || !acceptEl || !topCountriesEl || !topPortsEl) && statsBody) {
         const formatPort = (p) => {
           const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
           return `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} (${p && p.count ? p.count : 0})`;
         };
-
         statsBody.innerHTML = `
           <div><b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}</div>
           <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
@@ -747,7 +719,6 @@ function loadStats() {
         `;
       }
 
-      // Ensure custom port input visibility matches port select
       const customPortInput = document.getElementById("customPort");
       if (customPortInput && portSelect) {
         customPortInput.style.display = portSelect.value === "custom" ? "inline-block" : "none";
@@ -773,16 +744,10 @@ function lookupService(port) {
   return "Unknown";
 }
 
-// expose functions to global scope for inline handlers (keeps existing HTML working)
+// expose minimal globals for inline handlers
 window.initMap = initMap;
 window.resetFilters = resetFilters;
 window.addZoomButton = addZoomButton;
-// ensure onFilterChange points to debounced wrapper if available
-if (!debouncedOnFilterChange) {
-  debouncedOnFilterChange = debounce(onFilterChange, 200);
-}
-window.onFilterChange = debouncedOnFilterChange;
+window.onFilterChange = debounce(onFilterChange, 200);
 
-// start
 window.onload = initMap;
-
