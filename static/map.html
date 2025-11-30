@@ -31,16 +31,129 @@
       max-width: 600px;
       white-space: normal;
     }
+
+    /* Position the stats box as an overlay in the bottom-left corner */
+    #stats-box {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      z-index: 1000;
+      width: 360px;
+      max-height: 60vh;
+      overflow: auto;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+
+  <!-- Stats box overlay (bottom-left) -->
+  <div id="stats-box" aria-live="polite" role="region" aria-label="Statistics">
+    <div class="stats-header">
+      <span class="stats-title">Statistics</span>
+      <button id="stats-toggle" aria-pressed="false" aria-label="Minimize statistics">−</button>
+    </div>
+
+    <div class="stats-content">
+      <div id="stats-body" class="stats-bar">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><strong>DROP:</strong> <span id="stat-drop-count">—</span></div>
+          <div><strong>ACCEPT:</strong> <span id="stat-accept-count">—</span></div>
+          <div><button id="stats-refresh" title="Refresh statistics">Refresh</button></div>
+        </div>
+
+        <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
+
+        <div style="display:flex; gap:12px;">
+          <div style="flex:1; min-width:140px;">
+            <div style="font-weight:700; margin-bottom:6px;">Top Countries (20)</div>
+            <ol id="stat-top-countries" style="margin:0 0 0 18px; padding:0; max-height:36vh; overflow:auto;">
+              <li>—</li>
+            </ol>
+          </div>
+
+          <div style="flex:1; min-width:140px;">
+            <div style="font-weight:700; margin-bottom:6px;">Top Ports (20)</div>
+            <ol id="stat-top-ports" style="margin:0 0 0 18px; padding:0; max-height:36vh; overflow:auto;">
+              <li>—</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Leaflet core JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- MarkerCluster JS -->
   <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+
+  <!-- Stats toggle script -->
+  <script>
+  (function () {
+    const STORAGE_KEY = "net_sentinel_stats_minimized";
+
+    function qs(selector, root = document) {
+      return root.querySelector(selector);
+    }
+
+    function applyState(box, minimized) {
+      if (!box) return;
+      const btn = qs("#stats-toggle", box);
+      if (minimized) {
+        box.classList.add("minimized");
+        if (btn) {
+          btn.textContent = "+";
+          btn.setAttribute("aria-pressed", "true");
+          btn.setAttribute("aria-label", "Restore statistics");
+        }
+      } else {
+        box.classList.remove("minimized");
+        if (btn) {
+          btn.textContent = "−";
+          btn.setAttribute("aria-pressed", "false");
+          btn.setAttribute("aria-label", "Minimize statistics");
+        }
+      }
+    }
+
+    function initToggle() {
+      const box = document.getElementById("stats-box");
+      if (!box) return;
+
+      // Restore saved state
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const minimized = saved === "1";
+      applyState(box, minimized);
+
+      const btn = qs("#stats-toggle", box);
+      if (!btn) return;
+
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        const isMin = box.classList.contains("minimized");
+        const newState = !isMin;
+        applyState(box, newState);
+        localStorage.setItem(STORAGE_KEY, newState ? "1" : "0");
+      });
+
+      // Hook up refresh button to dispatch an event dashboard.js listens for
+      const refreshBtn = qs("#stats-refresh", box);
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", function () {
+          window.dispatchEvent(new CustomEvent("net_sentinel:refresh_stats"));
+        });
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initToggle);
+    } else {
+      initToggle();
+    }
+  })();
+  </script>
 
   <!-- Dashboard logic -->
   <script src="dashboard.js"></script>
