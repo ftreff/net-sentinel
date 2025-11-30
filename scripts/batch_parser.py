@@ -44,6 +44,9 @@ def main():
     else:
         log_file = DEFAULT_LOG_30 if use_30 else DEFAULT_LOG_7
 
+    # Choose target DB table based on whether we're processing 30-day archive
+    target_table = "ip_events_30" if use_30 else "ip_events"
+
     batch_size = args.batch_size if args.batch_size and args.batch_size > 0 else BATCH_SIZE
 
     if not os.path.exists(log_file):
@@ -71,15 +74,15 @@ def main():
                 batch.append(event)
 
                 if len(batch) >= batch_size:
-                    insert_events(batch)
+                    insert_events(batch, table=target_table)
                     inserted += len(batch)
                     batch = []
 
         if batch:
-            insert_events(batch)
+            insert_events(batch, table=target_table)
             inserted += len(batch)
 
-        print(f"[batch_parser] ✅ Inserted {inserted} events from {log_file}")
+        print(f"[batch_parser] ✅ Inserted {inserted} events from {log_file} into {target_table}")
 
     except Exception as e:
         print(f"[batch_parser] Error during parsing/insertion: {e}")
