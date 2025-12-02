@@ -677,7 +677,7 @@ function loadStats() {
         defaultOpt.value = "";
         defaultOpt.textContent = "All Countries";
         frag.appendChild(defaultOpt);
-        stats.top_countries.slice(0, 25).forEach(c => {
+        stats.top_countries.slice(0, 50).forEach(c => {
           const opt = document.createElement("option");
           opt.value = c && c.country ? c.country : "";
           opt.textContent = c && c.country ? c.country : "N/A";
@@ -694,7 +694,7 @@ function loadStats() {
         defaultOpt.value = "";
         defaultOpt.textContent = "All Ports";
         frag.appendChild(defaultOpt);
-        stats.top_ports.slice(0, 25).forEach(p => {
+        stats.top_ports.slice(0, 50).forEach(p => {
           const opt = document.createElement("option");
           opt.value = p && p.port != null ? String(p.port) : "";
           opt.textContent = p && p.port != null ? String(p.port) : "N/A";
@@ -714,7 +714,7 @@ function loadStats() {
 
       if (topCountriesEl) {
         const frag = document.createDocumentFragment();
-        stats.top_countries.slice(0, 25).forEach(c => {
+        stats.top_countries.slice(0, 50).forEach(c => {
           const li = document.createElement("li");
           li.innerHTML = `${c && c.country ? c.country : "N/A"} <span style="color: #00ffcc; float:right;">${c && c.count ? c.count : 0}</span>`;
           frag.appendChild(li);
@@ -725,7 +725,7 @@ function loadStats() {
 
       if (topPortsEl) {
         const frag = document.createDocumentFragment();
-        stats.top_ports.slice(0, 25).forEach(p => {
+        stats.top_ports.slice(0, 50).forEach(p => {
           const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
           const li = document.createElement("li");
           li.innerHTML = `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} <span style="color: #00ffcc; float:right;">${p && p.count ? p.count : 0}</span>`;
@@ -743,11 +743,11 @@ function loadStats() {
         statsBody.innerHTML = `
           <div><b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}</div>
           <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Countries (25)</div>
-          ${stats.top_countries.slice(0,25).map(c => `&nbsp;&nbsp;${c && c.country ? c.country : "N/A"} (${c && c.count ? c.count : 0})`).join("<br>")}
+          <div style="font-weight:700;">Top Countries (50)</div>
+          ${stats.top_countries.slice(0,50).map(c => `&nbsp;&nbsp;${c && c.country ? c.country : "N/A"} (${c && c.count ? c.count : 0})`).join("<br>")}
           <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Ports (25)</div>
-          ${stats.top_ports.slice(0,25).map(formatPort).join("<br>")}
+          <div style="font-weight:700;">Top Ports (50)</div>
+          ${stats.top_ports.slice(0,50).map(formatPort).join("<br>")}
         `;
       }
 
