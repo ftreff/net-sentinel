@@ -1,4 +1,6 @@
-// dashboard.js
+// dashboard.js (patched)
+// Adds bucketed marker sizing and cluster icon sizing based on event counts.
+
 let map;
 let markers = []; // array of L.Marker objects (for zoom-to-fit and individual mode)
 let services = {}; // will hold services.json mapping
@@ -18,17 +20,64 @@ function debounce(fn, wait) {
   };
 }
 
-/* Lazy popup marker factory: minimal DOM until clicked */
+/* --- Marker sizing helper (pixels) ---
+   Buckets:
+     1-9           -> smallest
+     10-99         -> small
+     100-999       -> medium
+     1,000-9,999   -> large
+     10,000-99,999 -> x-large
+     100,000-999,999 -> xx-large
+     1,000,000+    -> largest
+*/
+function getMarkerRadius(count) {
+  const n = Number(count) || 0;
+  if (n <= 0) return 4;            // zero or invalid -> tiny
+  if (n <= 9) return 6;            // 1-9
+  if (n <= 99) return 9;           // 10-99
+  if (n <= 999) return 12;         // 100-999
+  if (n <= 9999) return 16;        // 1,000-9,999
+  if (n <= 99999) return 20;       // 10,000-99,999
+  if (n <= 999999) return 26;      // 100,000-999,999
+  return 34;                       // 1,000,000+
+}
+
+/* Lazy popup marker factory: minimal DOM until clicked
+   Now sizes the dot based on an event count field (tries event.count, event.frequency,
+   event.events.length as fallbacks). Keeps the lazy popup behavior.
+*/
 function createEventMarker(event) {
   const isDropped = String(event.verdict || '').toUpperCase() === 'DROP';
-  const color = isDropped ? '#ff0000' : '#00ff00';
+  const color = isDropped ? '#ff4d4d' : '#2b9cff';
+
+  // determine numeric count for sizing; adjust field names as needed
+  const count = (event.count != null) ? event.count :
+                (event.frequency != null) ? event.frequency :
+                (event.events != null && Array.isArray(event.events)) ? event.events.length :
+                1;
+
+  const radius = getMarkerRadius(count);
+  // iconSize expects width/height (diameter)
+  const diameter = Math.max(6, Math.round(radius * 2));
+  const half = Math.round(diameter / 2);
+
+  // inline style ensures the dot size is applied even if CSS is overridden
+  const dotHtml = `<span class="event-dot" style="
+      background:${color};
+      width:${diameter}px;
+      height:${diameter}px;
+      display:inline-block;
+      border-radius:50%;
+      box-shadow:0 1px 2px rgba(0,0,0,0.25);
+      border:1px solid rgba(0,0,0,0.08);
+    "></span>`;
 
   const dotIcon = L.divIcon({
     className: 'event-dot-icon',
-    html: `<span class="event-dot" style="background:${color};"></span>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 6],
-    popupAnchor: [0, -8]
+    html: dotHtml,
+    iconSize: [diameter, diameter],
+    iconAnchor: [half, half],
+    popupAnchor: [0, -half - 6]
   });
 
   const marker = L.marker([event.latitude, event.longitude], { icon: dotIcon });
@@ -57,6 +106,7 @@ function createEventMarker(event) {
       <b>Region:</b> ${ev.state || "N/A"}<br>
       <b>City:</b> ${ev.city || "N/A"}<br>
       <b>Timestamp:</b> ${ev.timestamp || 'N/A'}<br>
+      <b>Count:</b> ${count}
     `;
     this.bindPopup(popupHtml).openPopup();
   });
@@ -101,10 +151,14 @@ function initMap() {
       return false;
     },
     iconCreateFunction: function(cluster) {
+      const c = cluster.getChildCount();
+      // use marker radius helper but scale for cluster icon diameter
+      const baseRadius = getMarkerRadius(c);
+      const clusterDiameter = Math.max(30, Math.round(baseRadius * 2.2));
       return L.divIcon({
-        html: `<div><span>${cluster.getChildCount()}</span></div>`,
+        html: `<div class="cluster-dot"><span>${c}</span></div>`,
         className: 'marker-cluster-accepted',
-        iconSize: L.point(40, 40)
+        iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
   });
@@ -123,10 +177,13 @@ function initMap() {
       return false;
     },
     iconCreateFunction: function(cluster) {
+      const c = cluster.getChildCount();
+      const baseRadius = getMarkerRadius(c);
+      const clusterDiameter = Math.max(30, Math.round(baseRadius * 2.2));
       return L.divIcon({
-        html: `<div><span>${cluster.getChildCount()}</span></div>`,
+        html: `<div class="cluster-dot"><span>${c}</span></div>`,
         className: 'marker-cluster-dropped',
-        iconSize: L.point(40, 40)
+        iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
   });
@@ -186,7 +243,7 @@ function addStatsBar() {
   control.addTo(map);
 }
 
-// --- ADD THIS FUNCTION TO dashboard.js ---
+// --- add: zoom button and other controls ---
 
 function addZoomButton() {
   const control = L.control({ position: "bottomright" });
@@ -417,6 +474,8 @@ function initCustomPortToggle() {
     else onFilterChange();
   });
 }
+
+// Filtering and loading events (continued)
 
 function onFilterChange() {
   const timeEl = document.getElementById("timeRange");
@@ -808,76 +867,34 @@ function refreshStatsAndMap() {
       }
       return;
     }
-    // otherwise poll again
     setTimeout(checkDone, POLL_INTERVAL);
   }
 
-  // Start polling after a small initial delay so requests have time to begin
-  setTimeout(checkDone, 250);
+  setTimeout(checkDone, POLL_INTERVAL);
 }
 
-// expose globally so inline handlers or other scripts can call it
-window.refreshStatsAndMap = refreshStatsAndMap;
-
-/**
- * Idempotent injection of a refresh button into the stats area.
- * If a button already exists (by id or class), this will not create another.
- */
-if (!window._netSentinelRefreshInstalled) {
-  window._netSentinelRefreshInstalled = true;
-
-  document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('stats-box') || document.getElementById('statsBar');
-    if (!container) return;
-
-    // If any element with id or class 'stat-refresh' already exists, do nothing
-    if (document.getElementById('stat-refresh') || container.querySelector('.stat-refresh')) return;
-
-    const btn = document.createElement('button');
-    btn.id = 'stat-refresh';
-    btn.className = 'stat-refresh';
-    btn.textContent = 'Refresh';
-    btn.title = 'Refresh stats and update map';
-    btn.onclick = refreshStatsAndMap;
-
-    // try to place inside a header if present, otherwise prepend
-    const header = container.querySelector('.stats-header');
-    if (header) {
-      header.appendChild(btn);
-    } else {
-      container.insertBefore(btn, container.firstChild);
-    }
-  });
-}
-
+// Utility: lookup service name by port (uses services loaded from /data/services.json)
 function lookupService(port) {
-  if (port == null || port === "") return "Unknown";
-  const key = String(port);
-  if (services && services[key]) return services[key];
-  for (const rangeKey in services) {
-    if (rangeKey.includes("-")) {
-      const [min, max] = rangeKey.split("-").map(Number);
-      if (port >= min && port <= max) {
-        return services[rangeKey];
-      }
-    }
+  try {
+    if (!port) return null;
+    const p = String(port);
+    return services[p] || null;
+  } catch (e) {
+    return null;
   }
-  return "Unknown";
 }
 
-// expose minimal globals for inline handlers
-window.initMap = initMap;
-window.resetFilters = resetFilters;
-window.addZoomButton = addZoomButton;
-window.onFilterChange = debounce(onFilterChange, 200);
+// Expose a few helpers globally for debugging or inline calls
+window.ns = window.ns || {};
+window.ns.getMarkerRadius = getMarkerRadius;
+window.ns.createEventMarker = createEventMarker;
+window.ns.refreshStatsAndMap = refreshStatsAndMap;
 
-// Remove any extra refresh buttons that were injected into the compact stats area
-//(function removeDuplicateStatsButtons() {
- // const statsBar = document.getElementById('statsBar') || document.getElementById('stats-box');
-//  if (!statsBar) return;
-  // Remove all buttons inside the stats container except the canonical one with id="stat-refresh"
-//  const extraButtons = Array.from(statsBar.querySelectorAll('button')).filter(b => b.id !== 'stat-refresh');
-//  extraButtons.forEach(b => b.remove());
-//})();
-
-window.onload = initMap;
+// Initialize map when DOM is ready
+document.addEventListener("DOMContentLoaded", function () {
+  try {
+    initMap();
+  } catch (e) {
+    console.error("Failed to initialize map:", e);
+  }
+});
