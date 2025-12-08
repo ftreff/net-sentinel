@@ -77,7 +77,9 @@ body.dark::after {
    JS sets iconSize on the divIcon; CSS makes inner content fill it.
    --------------------------- */
 
-/* Base cluster container (applies to both accepted and dropped cluster icons) */
+/* Base cluster container (applies to both accepted and dropped cluster icons)
+   Note: do not hardcode width/height here — iconSize returned by JS controls the size.
+*/
 .marker-cluster-accepted,
 .marker-cluster-dropped {
   display: inline-flex;
@@ -90,6 +92,9 @@ body.dark::after {
   font-weight: 700;
   text-align: center;
   overflow: hidden;
+  /* size comes from JS iconSize; keep min fallback small */
+  min-width: 20px;
+  min-height: 20px;
 }
 
 /* Inner cluster dot element (JS creates <div class="cluster-dot"><span>n</span></div>) */
@@ -103,14 +108,16 @@ body.dark::after {
   box-sizing: border-box;
 }
 
-/* Number inside cluster */
+/* Number inside cluster
+   Do not set a fixed font-size here; JS will set an inline font-size to ensure the number fits.
+*/
 .marker-cluster-accepted .cluster-dot span,
 .marker-cluster-dropped .cluster-dot span {
   display: inline-block;
   line-height: 1;
-  font-size: 0.95em;
   padding: 0 6px;
   white-space: nowrap;
+  /* font-size intentionally left unset so JS can control it for perfect fit */
 }
 
 /* Color variants */
@@ -127,8 +134,8 @@ body.dark::after {
 
 /* Fallback sizing for older browsers where JS iconSize might not be applied */
 .marker-cluster-accepted, .marker-cluster-dropped {
-  min-width: 30px;
-  min-height: 30px;
+  min-width: 20px;
+  min-height: 20px;
 }
 
 /* ---------------------------
