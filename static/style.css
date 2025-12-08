@@ -1,6 +1,6 @@
 /* style.css
    Net Sentinel — unified UI + Statistics styling
-   Updated to match marker colors: red (#ff0000) and green (#00ff00)
+   Updated to support bucketed marker sizing and scalable cluster icons
 */
 
 :root{
@@ -72,65 +72,85 @@ body.dark::after {
   z-index: 9999;
 }
 
-/* Marker cluster styling (base) */
-.marker-cluster-small { background-color: rgba(0,255,204,0.4); color: #000; }
-.marker-cluster-medium { background-color: rgba(0,255,204,0.6); color: #000; }
-.marker-cluster-large { background-color: rgba(0,255,204,0.8); color: #000; }
+/* ---------------------------
+   Cluster icon styling (scalable)
+   JS sets iconSize on the divIcon; CSS makes inner content fill it.
+   --------------------------- */
 
-.marker-cluster div {
-  background-color: var(--ns-accent);
-  border: 2px solid var(--ns-bg);
+/* Base cluster container (applies to both accepted and dropped cluster icons) */
+.marker-cluster-accepted,
+.marker-cluster-dropped {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
   color: #000;
   font-family: var(--ns-font);
-  font-weight: bold;
-}
-.marker-cluster span { line-height: 30px; font-size: 14px; }
-
-/* Cluster variants for accepted and dropped groups (match chosen colors) */
-.marker-cluster-accepted div {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #00ff00; /* vivid green */
-  display: inline-block;
-  text-align: center;
-  line-height: 40px;
   font-weight: 700;
-  color: #000;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-  border: 2px solid rgba(0,0,0,0.12);
-}
-.marker-cluster-dropped div {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #ff0000; /* vivid red */
-  display: inline-block;
   text-align: center;
-  line-height: 40px;
-  font-weight: 700;
-  color: #000;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-  border: 2px solid rgba(0,0,0,0.12);
+  overflow: hidden;
 }
 
-/* Event dot icon (used for individual markers) */
+/* Inner cluster dot element (JS creates <div class="cluster-dot"><span>n</span></div>) */
+.marker-cluster-accepted .cluster-dot,
+.marker-cluster-dropped .cluster-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* Number inside cluster */
+.marker-cluster-accepted .cluster-dot span,
+.marker-cluster-dropped .cluster-dot span {
+  display: inline-block;
+  line-height: 1;
+  font-size: 0.95em;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+/* Color variants */
+.marker-cluster-accepted {
+  background: linear-gradient(180deg, rgba(0,255,0,0.95), rgba(0,200,0,0.9));
+  border: 2px solid rgba(0,0,0,0.12);
+  color: #000;
+}
+.marker-cluster-dropped {
+  background: linear-gradient(180deg, rgba(255,77,77,0.95), rgba(220,40,40,0.9));
+  border: 2px solid rgba(0,0,0,0.12);
+  color: #000;
+}
+
+/* Fallback sizing for older browsers where JS iconSize might not be applied */
+.marker-cluster-accepted, .marker-cluster-dropped {
+  min-width: 30px;
+  min-height: 30px;
+}
+
+/* ---------------------------
+   Individual event dot styling
+   JS now sets inline width/height on .event-dot; CSS handles visuals
+   --------------------------- */
+
 .event-dot-icon {
   display: inline-block;
   line-height: 0;
   pointer-events: auto;
 }
 
-/* The visible dot (matches JS colors: red/green applied inline) */
+/* The visible dot (color applied inline by JS) */
+/* width/height are set inline by JS to match bucketed sizes */
 .event-dot {
   display: inline-block;
-  width: 12px;            /* slightly larger for visibility */
-  height: 12px;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.6);
   box-shadow: 0 1px 3px rgba(0,0,0,0.5);
   vertical-align: middle;
+  box-sizing: border-box;
 }
 
 /* Ensure divIcon contents are visible inside Leaflet marker elements */
@@ -145,6 +165,15 @@ body.dark::after {
   transform: scale(1.25);
   transition: transform 120ms ease;
 }
+
+/* Make sure popup anchor area is clickable even for very small dots */
+.leaflet-marker-icon {
+  cursor: pointer;
+}
+
+/* ---------------------------
+   Stats / UI styling (unchanged, but kept here for completeness)
+   --------------------------- */
 
 /* === Stats box base === */
 #stats-box {
