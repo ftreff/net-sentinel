@@ -151,13 +151,23 @@ function initMap() {
       return false;
     },
     iconCreateFunction: function(cluster) {
+      // number of child markers in this cluster
       const c = cluster.getChildCount();
-      // use marker radius helper but scale for cluster icon diameter
+
+      // base radius from your helper
       const baseRadius = getMarkerRadius(c);
-      const clusterDiameter = Math.max(30, Math.round(baseRadius * 2.2));
+
+      // diameter derived from baseRadius; allow very small diameters for small buckets
+      // clamp range: [10, 96] px (adjust 10 upward if you want a slightly larger minimum)
+      const clusterDiameter = Math.min(96, Math.max(10, Math.round(baseRadius * 2)));
+
+      // compute font size so the number fits; reduce padding effect by using smaller multiplier
+      const fontSize = Math.max(8, Math.round(clusterDiameter * 0.45));
+
+      // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
-        html: `<div class="cluster-dot"><span>${c}</span></div>`,
-        className: 'marker-cluster-accepted',
+        html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
+        className: 'marker-cluster-accepted', // use 'marker-cluster-dropped' in droppedClusters
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
@@ -177,12 +187,23 @@ function initMap() {
       return false;
     },
     iconCreateFunction: function(cluster) {
+      // number of child markers in this cluster
       const c = cluster.getChildCount();
+
+      // base radius from your helper
       const baseRadius = getMarkerRadius(c);
-      const clusterDiameter = Math.max(30, Math.round(baseRadius * 2.2));
+
+      // diameter derived from baseRadius; allow very small diameters for small buckets
+      // clamp range: [10, 96] px (adjust 10 upward if you want a slightly larger minimum)
+      const clusterDiameter = Math.min(96, Math.max(10, Math.round(baseRadius * 2)));
+
+      // compute font size so the number fits; reduce padding effect by using smaller multiplier
+      const fontSize = Math.max(8, Math.round(clusterDiameter * 0.45));
+
+      // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
-        html: `<div class="cluster-dot"><span>${c}</span></div>`,
-        className: 'marker-cluster-dropped',
+        html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
+        className: 'marker-cluster-accepted', // use 'marker-cluster-dropped' in droppedClusters
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
