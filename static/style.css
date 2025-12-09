@@ -92,9 +92,10 @@ body.dark::after {
   font-weight: 700;
   text-align: center;
   overflow: hidden;
-  /* size comes from JS iconSize; keep min fallback small */
-  min-width: 20px;
-  min-height: 20px;
+  /* allow very small clusters while keeping a tiny fallback */
+  min-width: 10px;
+  min-height: 10px;
+  padding: 0; /* avoid extra padding increasing apparent size */
 }
 
 /* Inner cluster dot element (JS creates <div class="cluster-dot"><span>n</span></div>) */
@@ -110,12 +111,13 @@ body.dark::after {
 
 /* Number inside cluster
    Do not set a fixed font-size here; JS will set an inline font-size to ensure the number fits.
+   Keep padding minimal so small diameters remain compact.
 */
 .marker-cluster-accepted .cluster-dot span,
 .marker-cluster-dropped .cluster-dot span {
   display: inline-block;
   line-height: 1;
-  padding: 0 6px;
+  padding: 0 4px;
   white-space: nowrap;
   /* font-size intentionally left unset so JS can control it for perfect fit */
 }
@@ -123,19 +125,13 @@ body.dark::after {
 /* Color variants */
 .marker-cluster-accepted {
   background: linear-gradient(180deg, rgba(0,255,0,0.95), rgba(0,200,0,0.9));
-  border: 2px solid rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.12);
   color: #000;
 }
 .marker-cluster-dropped {
   background: linear-gradient(180deg, rgba(255,77,77,0.95), rgba(220,40,40,0.9));
-  border: 2px solid rgba(0,0,0,0.12);
+  border: 1px solid rgba(0,0,0,0.12);
   color: #000;
-}
-
-/* Fallback sizing for older browsers where JS iconSize might not be applied */
-.marker-cluster-accepted, .marker-cluster-dropped {
-  min-width: 20px;
-  min-height: 20px;
 }
 
 /* ---------------------------
