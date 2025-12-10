@@ -379,3 +379,85 @@ body.dark::after {
   outline: 2px solid rgba(0,255,204,0.18);
   outline-offset: 2px;
 }
+
+/* ---------------------------
+   Patch additions (merged)
+   These rules augment the existing stylesheet to ensure cluster-dot inner layout,
+   Top 100 button styling, and small filter control tweaks are present.
+   Non-destructive: they do not override your main color tokens or layout.
+   --------------------------- */
+
+/* Inner cluster dot base (ensures the .cluster-dot element fills the iconSize set by JS) */
+.cluster-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  border-radius: 50%;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  text-align: center;
+}
+
+/* Slightly bolder cluster label and vertical nudge for optical centering */
+.cluster-dot span {
+  display: inline-block;
+  line-height: 1;
+  font-weight: 800;
+  padding: 0 4px;
+  transform: translateY(-1px);
+  white-space: nowrap;
+}
+
+/* Top 100 button baseline (matches the button in map.html and fallback control) */
+#open-top100 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,255,204,0.12);
+  background: linear-gradient(180deg, rgba(0,255,204,0.06), rgba(0,255,204,0.03));
+  color: #000;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--ns-font);
+}
+
+/* Make filter-box controls match the rest of the UI when dashboard.js creates them */
+.filter-box select,
+.filter-box input[type="text"] {
+  margin: 6px 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  color: var(--ns-accent);
+  font-family: var(--ns-font);
+}
+
+/* Ensure very small cluster icons remain legible by clamping text size if JS doesn't set it */
+.marker-cluster-accepted .cluster-dot span,
+.marker-cluster-dropped .cluster-dot span {
+  font-size: clamp(8px, 1.8vw, 18px);
+}
+
+/* Small visual polish for fallback statsBar header elements created by JS */
+.stats-bar .stats-summary button,
+.stats-bar .stats-summary a {
+  font-family: var(--ns-font);
+  font-weight: 700;
+}
+
+/* Keep cluster-dot and event-dot rendering consistent across browsers */
+.cluster-dot,
+.event-dot {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* End of merged stylesheet */
