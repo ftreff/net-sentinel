@@ -1,5 +1,6 @@
 // dashboard.js (patched)
-// Adds bucketed marker sizing and cluster icon sizing based on event counts.
+// Adds bucketed marker sizing and cluster icon sizing based on event counts,
+// and ensures the Top 100 button exists in both full and fallback stats UI.
 
 let map;
 let markers = []; // array of L.Marker objects (for zoom-to-fit and individual mode)
@@ -40,6 +41,18 @@ function getMarkerRadius(count) {
   if (n <= 99999) return 20;       // 10,000-99,999
   if (n <= 999999) return 26;      // 100,000-999,999
   return 34;                       // 1,000,000+
+}
+
+/* Lookup service name by port using services.json mapping */
+function lookupService(port) {
+  try {
+    if (!services || typeof services !== 'object') return null;
+    const p = Number(port);
+    if (Number.isNaN(p)) return null;
+    return services[p] || null;
+  } catch (e) {
+    return null;
+  }
 }
 
 /* Lazy popup marker factory: minimal DOM until clicked
@@ -166,7 +179,7 @@ function initMap() {
 
       // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
-        html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
+        html: `<div class="cluster-dot" style="width:${clusterDiameter}px;height:${clusterDiameter}px;line-height:${clusterDiameter}px;font-size:${fontSize}px;"><span>${c}</span></div>`,
         className: 'marker-cluster-accepted',
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
@@ -202,7 +215,7 @@ function initMap() {
 
       // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
-        html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
+        html: `<div class="cluster-dot" style="width:${clusterDiameter}px;height:${clusterDiameter}px;line-height:${clusterDiameter}px;font-size:${fontSize}px;"><span>${c}</span></div>`,
         className: 'marker-cluster-dropped',
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
@@ -243,8 +256,9 @@ function initMap() {
   });
 }
 
-/* Stats bar control (compact fallback) */
+// --- Stats bar control (compact fallback) ---
 function addStatsBar() {
+  // If the full stats-box exists in the page, do nothing (map.html handles the Top100 button there)
   if (document.getElementById("stats-box")) {
     return;
   }
@@ -253,14 +267,98 @@ function addStatsBar() {
   control.onAdd = function () {
     const div = L.DomUtil.create("div", "stats-bar");
     div.id = "statsBar";
+    div.setAttribute("role", "region");
+    div.setAttribute("aria-live", "polite");
     div.style.background = "rgba(0,0,0,0.7)";
     div.style.color = "white";
     div.style.padding = "6px";
     div.style.fontSize = "12px";
     div.style.maxHeight = "750px";
     div.style.overflowY = "auto";
+
+    // header row: counts + Top 100 button
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.alignItems = "center";
+    header.style.justifyContent = "space-between";
+    header.style.gap = "12px";
+
+    const counts = document.createElement("div");
+    counts.style.display = "flex";
+    counts.style.alignItems = "center";
+    counts.style.gap = "8px";
+    counts.innerHTML = `<strong>DROPPED:</strong> <span id="stat-drop-count">—</span>
+                        <span style="color: rgba(255,255,255,0.35); margin: 0 6px;">/</span>
+                        <strong>ACCEPTED:</strong> <span id="stat-accept-count">—</span>`;
+
+    const right = document.createElement("div");
+
+    const topBtn = document.createElement("button");
+    topBtn.id = "open-top100";
+    topBtn.title = "Open Top 100 Stats Page";
+    topBtn.style.background = "linear-gradient(180deg, rgba(0,255,204,0.06), rgba(0,255,204,0.03))";
+    topBtn.style.color = "#000";
+    topBtn.style.border = "1px solid rgba(0,255,204,0.12)";
+    topBtn.style.padding = "6px 10px";
+    topBtn.style.borderRadius = "4px";
+    topBtn.style.fontWeight = "700";
+    topBtn.style.cursor = "pointer";
+    topBtn.textContent = "Top 100 Stats Page";
+
+    // optional refresh button (kept for parity with map.html)
+    const refreshBtn = document.createElement("button");
+    refreshBtn.id = "stats-refresh";
+    refreshBtn.title = "Refresh statistics";
+    refreshBtn.style.marginLeft = "8px";
+    refreshBtn.textContent = "Refresh";
+
+    right.appendChild(topBtn);
+    // keep refresh button but visible in fallback; dashboard.js listens for it if present
+    right.appendChild(refreshBtn);
+
+    header.appendChild(counts);
+    header.appendChild(right);
+
+    div.appendChild(header);
+
+    // separator
+    const hr = document.createElement("hr");
+    hr.style.border = "none";
+    hr.style.borderTop = "1px solid rgba(255,255,255,0.06)";
+    hr.style.margin = "8px 0";
+    div.appendChild(hr);
+
+    // columns container
+    const cols = document.createElement("div");
+    cols.className = "stats-columns";
+    cols.style.display = "flex";
+    cols.style.gap = "12px";
+
+    const countriesCol = document.createElement("div");
+    countriesCol.className = "stats-col countries";
+    countriesCol.innerHTML = `<h4 style="margin:0 0 6px 0;">Top 50 Countries</h4><ol id="stat-top-countries"><li>—</li></ol>`;
+
+    const portsCol = document.createElement("div");
+    portsCol.className = "stats-col ports";
+    portsCol.innerHTML = `<h4 style="margin:0 0 6px 0;">Top 50 Ports</h4><ol id="stat-top-ports"><li>—</li></ol>`;
+
+    cols.appendChild(countriesCol);
+    cols.appendChild(portsCol);
+    div.appendChild(cols);
+
+    // attach event handlers (same behavior as map.html)
+    topBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      window.open('/top100', '_blank', 'noopener,noreferrer');
+    });
+
+    refreshBtn.addEventListener("click", function () {
+      window.dispatchEvent(new CustomEvent("net_sentinel:refresh_stats"));
+    });
+
     return div;
   };
+
   control.addTo(map);
 }
 
@@ -436,6 +534,7 @@ function addClusterRadiusControl() {
 
       // re-run filter to re-add markers in the chosen mode
       if (window.onFilterChange) window.onFilterChange();
+      else onFilterChange();
       label.innerHTML = useClusters ?
         "Mode: Grouped (Radius " + currentClusterRadius + ")" :
         "Mode: Individual";
@@ -806,34 +905,26 @@ function loadStats() {
       if (topPortsEl) {
         const frag = document.createDocumentFragment();
         stats.top_ports.slice(0, 50).forEach(p => {
-          const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
           const li = document.createElement("li");
-          li.innerHTML = `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} <span style="color: #00ffcc; float:right;">${p && p.count ? p.count : 0}</span>`;
+          const portLabel = (p && p.port != null) ? String(p.port) : "N/A";
+          const portCount = (p && p.count != null) ? p.count : 0;
+          li.innerHTML = `${portLabel} <span style="color: #00ffcc; float:right;">${portCount}</span>`;
           frag.appendChild(li);
         });
         topPortsEl.innerHTML = "";
         topPortsEl.appendChild(frag);
       }
 
-      if ((!dropEl || !acceptEl || !topCountriesEl || !topPortsEl) && statsBody) {
-        const formatPort = (p) => {
-          const svc = lookupService(Number(p && p.port)) || (p && p.service) || "";
-          return `${p && p.port != null ? p.port : "N/A"}${svc ? " (" + svc + ")" : ""} (${p && p.count ? p.count : 0})`;
-        };
-        statsBody.innerHTML = `
-          <div><b>DROP:</b> ${stats.drop_count} &nbsp; <b>ACCEPT:</b> ${stats.accept_count}</div>
-          <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Countries (50)</div>
-          ${stats.top_countries.slice(0,50).map(c => `&nbsp;&nbsp;${c && c.country ? c.country : "N/A"} (${c && c.count ? c.count : 0})`).join("<br>")}
-          <hr style="border-color: rgba(0,255,204,0.08); margin:8px 0;">
-          <div style="font-weight:700;">Top Ports (50)</div>
-          ${stats.top_ports.slice(0,50).map(formatPort).join("<br>")}
-        `;
-      }
-
-      const customPortInput = document.getElementById("customPort");
-      if (customPortInput && portSelect) {
-        customPortInput.style.display = portSelect.value === "custom" ? "inline-block" : "none";
+      // Optionally populate a compact statsBar body if present
+      if (statsBody) {
+        // keep it minimal to avoid overwriting custom UI
+        const sb = [];
+        sb.push(`<div style="font-weight:bold;">Accepts: ${stats.accept_count}</div>`);
+        sb.push(`<div style="font-weight:bold;">Drops: ${stats.drop_count}</div>`);
+        if (stats.top_countries && stats.top_countries.length) {
+          sb.push(`<div style="margin-top:6px;">Top country: ${stats.top_countries[0].country || "N/A"} (${stats.top_countries[0].count || 0})</div>`);
+        }
+        statsBody.innerHTML = sb.join("");
       }
     })
     .catch((err) => {
@@ -841,81 +932,22 @@ function loadStats() {
     });
 }
 
-// --- add: refresh button + combined refresh handler ---
-
-/**
- * Refresh both stats and the map using current filters.
- * Uses the existing onFilterChange (debounced wrapper if present).
- */
+/* Helper to refresh both stats and events */
 function refreshStatsAndMap() {
-  const btn = document.getElementById('stat-refresh');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Refreshing...';
-  }
-
-  // Kick off stats and events refresh
-  try { loadStats(); } catch (e) { console.warn('loadStats failed:', e); }
   try {
-    // Prefer the debounced wrapper if present so we don't spam the server
-    if (typeof window.onFilterChange === 'function') {
-      window.onFilterChange();
-    } else {
-      onFilterChange();
+    if (window.onFilterChange) window.onFilterChange();
+    else {
+      loadStats();
+      loadEvents();
     }
   } catch (e) {
-    console.warn('onFilterChange failed:', e);
-  }
-
-  // Wait until chunked loading (if any) finishes, or timeout
-  const statsBar = document.getElementById('statsBar');
-  const MAX_WAIT_MS = 10000; // maximum wait before re-enabling button
-  const POLL_INTERVAL = 200;
-  const start = Date.now();
-
-  function checkDone() {
-    // If statsBar indicates loading (set by chunkProgress), keep waiting
-    const stillLoading = statsBar && statsBar.dataset && statsBar.dataset.loading === 'true';
-
-    // Also consider cluster groups: if chunkedLoading is used, chunkProgress sets statsBar.dataset.loading.
-    // If no statsBar or no dataset flag, we still wait a short grace period to let fetches start.
-    const elapsed = Date.now() - start;
-    if (!stillLoading || elapsed >= MAX_WAIT_MS) {
-      // done or timed out — re-enable button
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Refresh';
-      }
-      return;
-    }
-    setTimeout(checkDone, POLL_INTERVAL);
-  }
-
-  setTimeout(checkDone, POLL_INTERVAL);
-}
-
-// Utility: lookup service name by port (uses services loaded from /data/services.json)
-function lookupService(port) {
-  try {
-    if (!port) return null;
-    const p = String(port);
-    return services[p] || null;
-  } catch (e) {
-    return null;
+    console.warn("refreshStatsAndMap failed:", e);
   }
 }
 
-// Expose a few helpers globally for debugging or inline calls
-window.ns = window.ns || {};
-window.ns.getMarkerRadius = getMarkerRadius;
-window.ns.createEventMarker = createEventMarker;
-window.ns.refreshStatsAndMap = refreshStatsAndMap;
-
-// Initialize map when DOM is ready
-document.addEventListener("DOMContentLoaded", function () {
-  try {
-    initMap();
-  } catch (e) {
-    console.error("Failed to initialize map:", e);
-  }
-});
+// initialize map when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initMap);
+} else {
+  initMap();
+}
