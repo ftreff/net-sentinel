@@ -167,7 +167,7 @@ function initMap() {
       // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
         html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
-        className: 'marker-cluster-accepted', // use 'marker-cluster-dropped' in droppedClusters
+        className: 'marker-cluster-accepted',
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
@@ -203,7 +203,7 @@ function initMap() {
       // return divIcon with inline font-size so label scales with diameter
       return L.divIcon({
         html: `<div class="cluster-dot" style="font-size:${fontSize}px;"><span>${c}</span></div>`,
-        className: 'marker-cluster-accepted', // use 'marker-cluster-dropped' in droppedClusters
+        className: 'marker-cluster-dropped',
         iconSize: L.point(clusterDiameter, clusterDiameter)
       });
     }
